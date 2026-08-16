@@ -611,4 +611,35 @@ def gerar_pdf(codigo_imovel):
     if tamanho < 10000:
         return None
 
+    # -------------------------------------------------
+    # SALVAR O PDF GERADO NO GOOGLE DRIVE (NA PASTA DO IMÓVEL)
+    # -------------------------------------------------
+    try:
+        from googleapiclient.http import MediaFileUpload
+       
+        # Nome do arquivo PDF final
+        nome_pdf = f"{sanitizar_nome_arquivo(codigo_imovel)}.pdf"
+       
+        # Verifica se já existe um PDF antigo na pasta do imóvel para atualizar ou criar novo
+        query_pdf = f"'{id_pasta_imovel}' in parents and name = '{nome_pdf}' and trashed = false"
+        res_pdf = drive.files().list(q=query_pdf, fields="files(id)").execute()
+        arquivos_existentes = res_pdf.get("files", [])
+
+        media = MediaFileUpload(str(pdf_local_path), mimetype="application/pdf")
+
+        if arquivos_existentes:
+            # Atualiza o arquivo existente no Drive
+            file_id = arquivos_existentes[0]["id"]
+            drive.files().update(fileId=file_id, media_body=media).execute()
+        else:
+            # Cria um novo arquivo PDF na pasta do imóvel
+            metadata = {
+                "name": nome_pdf,
+                "parents": [id_pasta_imovel]
+            }
+            drive.files().create(body=metadata, media_body=media, fields="id").execute()
+           
+    except Exception as e:
+        print(f"Erro ao salvar o PDF no Google Drive: {e}", flush=True)
+
     return str(pdf_local_path)
