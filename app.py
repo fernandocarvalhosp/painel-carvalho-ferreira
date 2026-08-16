@@ -1,18 +1,16 @@
 # -*- coding: utf-8 -*-
-from pathlib import Path
-import importlib
-
 import streamlit as st
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-
-import gerador_pdf
-import gerar_posts
 import json
-import streamlit as st
 from google.oauth2 import service_account
+import gerador_pdf
 
-# Lê as credenciais diretamente do painel seguro do Streamlit Cloud
+# Defina os escopos que seu aplicativo usa (ajuste se precisar de mais algum)
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
+# Leitura segura das credenciais do Streamlit Secrets
 creds_dict = dict(st.secrets["google_credentials"])
 creds = service_account.Credentials.from_service_account_info(
     creds_dict, scopes=SCOPES
