@@ -8,7 +8,15 @@ from googleapiclient.discovery import build
 
 import gerador_pdf
 import gerar_posts
+import json
+import streamlit as st
+from google.oauth2 import service_account
 
+# Lê as credenciais diretamente do painel seguro do Streamlit Cloud
+creds_dict = dict(st.secrets["google_credentials"])
+creds = service_account.Credentials.from_service_account_info(
+    creds_dict, scopes=SCOPES
+)
 # -------------------------------------------------
 # CONFIGURACAO DA PAGINA
 # -------------------------------------------------
