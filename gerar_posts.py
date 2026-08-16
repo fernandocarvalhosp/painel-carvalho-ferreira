@@ -14,7 +14,7 @@ import weasyprint
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 SCOPES = [
-    "https://www.googleapis.com/auth/drive",
+    "https://www.googleapis.com/auth/drive.readonly",
     "https://www.googleapis.com/auth/spreadsheets.readonly",
 ]
 
