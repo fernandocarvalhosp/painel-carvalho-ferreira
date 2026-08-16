@@ -1,68 +1,55 @@
+# -*- coding: utf-8 -*-
 import io
 import os
-import zipfile
-import tempfile
+import re
 from pathlib import Path
-from googleapiclient.discovery import build
-from google.oauth2 import service_account
-from googleapiclient.http import MediaIoBaseDownload
-from weasyprint import HTML
-import fitz
-import streamlit as st
 
-# =============================================================================
-# CONFIGURACAO
-# =============================================================================
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload
+from jinja2 import Template
+import streamlit as st
+import weasyprint
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+
 SCOPES = [
-    "https://www.googleapis.com/auth/drive.readonly",
+    "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/spreadsheets.readonly",
 ]
 
 ID_RAIZ = "1NaZ7kv_jHVCTlLV8vqxCzBwbTX5y3fR7"
-ID_PASTA_MARCA = "19b_7n4ER-hmFyhvMmFIO1pBmPlRu85aA"
 SPREADSHEET_ID = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
 NOME_ABA = "Imoveis"
 
-COR_AZUL_ESCURO = "#0A1F2E"
-COR_AZUL_BLOCO = "#0D2538"
-COR_OFF_WHITE = "#F7F5F0"
-COR_AZUL_SUAVE = "#94A3B8"
-COR_LINHA = "#26384A"
 
-
-# =============================================================================
-# GOOGLE CONEXAO E BUSCA (Híbrida: Local / Nuvem via st.secrets)
-# =============================================================================
+@st.cache_resource
 def conectar_google():
     try:
-        # Tenta carregar credenciais via secrets do Streamlit (nuvem)
-        if hasattr(st, "secrets") and "gcp_service_account" in st.secrets:
-            creds_dict = dict(st.secrets["gcp_service_account"])
-            creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
-        else:
-            # Fallback para arquivo local se estiver testando na máquina
-            credencial_path = Path(__file__).resolve().parent / "config" / "credentials.json"
-            creds = service_account.Credentials.from_service_account_file(str(credencial_path), scopes=SCOPES)
-           
-        return (
-            build("drive", "v3", credentials=creds),
-            build("sheets", "v4", credentials=creds),
+        creds_dict = dict(st.secrets["google_credentials"])
+        creds = service_account.Credentials.from_service_account_info(
+            creds_dict, scopes=SCOPES
         )
+        drive = build("drive", "v3", credentials=creds)
+        sheets = build("sheets", "v4", credentials=creds)
+        return drive, sheets
     except Exception as e:
-        print(f"Erro ao autenticar: {e}", flush=True)
+        print(f"Erro ao autenticar no Google: {e}", flush=True)
         return None, None
 
 
 def buscar_id_por_nome(service, nome_item, id_pasta_pai):
     if not service or not id_pasta_pai:
         return None
+
+    query = (
+        f"'{id_pasta_pai}' in parents "
+        f"and name = '{nome_item}' "
+        f"and trashed = false"
+    )
     try:
         results = service.files().list(
-            q=(
-                f"'{id_pasta_pai}' in parents "
-                f"and name = '{nome_item}' "
-                f"and trashed = false"
-            ),
+            q=query,
             fields="files(id, name)",
             supportsAllDrives=True,
             includeItemsFromAllDrives=True,
@@ -74,21 +61,28 @@ def buscar_id_por_nome(service, nome_item, id_pasta_pai):
         return None
 
 
-def buscar_pasta_imovel_por_codigo(service, codigo, id_imoveis):
-    codigo = codigo.strip().upper()
+def buscar_pasta_imovel_por_codigo(service, codigo_imovel, id_pasta_imoveis):
+    if not service or not id_pasta_imoveis:
+        return None
+
+    codigo = codigo_imovel.strip().upper()
+    query = (
+        f"'{id_pasta_imoveis}' in parents "
+        f"and mimeType = 'application/vnd.google-apps.folder' "
+        f"and name contains '{codigo}' "
+        f"and trashed = false"
+    )
     try:
         results = service.files().list(
-            q=(
-                f"'{id_imoveis}' in parents "
-                f"and mimeType = 'application/vnd.google-apps.folder' "
-                f"and name contains '{codigo}' "
-                f"and trashed = false"
-            ),
+            q=query,
             fields="files(id, name)",
             supportsAllDrives=True,
             includeItemsFromAllDrives=True,
         ).execute()
         files = results.get("files", [])
+        if not files:
+            return None
+
         for f in files:
             nome = f["name"].strip().upper()
             if (
@@ -97,137 +91,69 @@ def buscar_pasta_imovel_por_codigo(service, codigo, id_imoveis):
                 or nome.startswith(codigo + "-")
             ):
                 return f["id"]
-        return files[0]["id"] if files else None
+        return files[0]["id"]
     except Exception as e:
-        print(f"Erro ao buscar pasta do imovel: {e}", flush=True)
+        print(f"Erro ao buscar pasta do imovel '{codigo_imovel}': {e}", flush=True)
         return None
 
 
-def obter_id_pasta_imovel(service, codigo):
+def obter_id_pasta_imovel(service, codigo_imovel):
     id_portfolio = buscar_id_por_nome(service, "PORTFOLIO", ID_RAIZ)
     if not id_portfolio:
         return None
+
     id_imoveis = buscar_id_por_nome(service, "IMOVEIS", id_portfolio)
     if not id_imoveis:
         return None
-    return buscar_pasta_imovel_por_codigo(service, codigo, id_imoveis)
+
+    id_imovel = buscar_pasta_imovel_por_codigo(service, codigo_imovel, id_imoveis)
+    if not id_imovel:
+        return None
+
+    return id_imovel
 
 
-def baixar_arquivo_bytes(service, id_arquivo):
-    """Baixa arquivos diretamente para a memória RAM (BytesIO) evitando disco local."""
+def baixar_arquivo_por_id(service, id_arquivo, caminho_local):
     try:
         request = service.files().get_media(fileId=id_arquivo)
-        fh = io.BytesIO()
+        fh = io.FileIO(str(caminho_local), "wb")
         downloader = MediaIoBaseDownload(fh, request)
         done = False
         while not done:
-            _, done = downloader.next_chunk()
-        fh.seek(0)
-        return fh
+            status, done = downloader.next_chunk()
+        return True
     except Exception as e:
-        print(f"Erro download em memória: {e}", flush=True)
+        print(f"Erro ao baixar arquivo {id_arquivo}: {e}", flush=True)
+        return False
+
+
+def carregar_icone_local(nome_arquivo, cor=None):
+    caminho = SCRIPT_DIR / "marca" / "icones" / nome_arquivo
+    if not caminho.exists():
+        return ""
+    with open(caminho, "r", encoding="utf-8") as f:
+        svg = f.read()
+    if cor:
+        svg = svg.replace("currentColor", cor)
+    return svg
+
+
+def buscar_logo_local():
+    logo_dir = SCRIPT_DIR / "marca" / "logo"
+    if not logo_dir.exists():
         return None
-
-
-def obter_ativo_marca_base64(service, subpasta, nome_arquivo):
-    """Converte assets fixos (como fontes, logos) para Base64/URI em memória."""
-    id_sub = buscar_id_por_nome(service, subpasta, ID_PASTA_MARCA)
-    if not id_sub:
-        return ""
-    id_arq = buscar_id_por_nome(service, nome_arquivo, id_sub)
-    if not id_arq:
-        return ""
-   
-    fh = baixar_arquivo_bytes(service, id_arq)
-    if not fh:
-        return ""
-   
-    import base64
-    ext = Path(nome_arquivo).suffix.lower()
-    mime = "application/font-ttf" if ext in [".ttf", ".otf"] else "image/png"
-    if ext == ".svg":
-        mime = "image/svg+xml"
-    elif ext in [".jpg", ".jpeg"]:
-        mime = "image/jpeg"
-       
-    encoded = base64.b64encode(fh.read()).decode("utf-8")
-    return f"data:{mime};charset=utf-8;base64,{encoded}"
-
-
-def montar_css_fontes(service):
-    itens = [
-        ("CormorantGaramond-Medium.ttf", "Cormorant Garamond", 500),
-        ("CormorantGaramond-SemiBold.ttf", "Cormorant Garamond", 600),
-        ("Manrope-Regular.ttf", "Manrope", 400),
-        ("Manrope-Medium.ttf", "Manrope", 500),
-        ("Manrope-SemiBold.ttf", "Manrope", 600),
-    ]
-    blocos = []
-    for arq, fam, peso in itens:
-        uri = obter_ativo_marca_base64(service, "FONTES", arq)
-        if uri:
-            blocos.append(
-                f"""
-                @font-face {{
-                    font-family: '{fam}';
-                    src: url('{uri}') format('truetype');
-                    font-weight: {peso};
-                    font-style: normal;
-                }}
-                """
-            )
-    return "\n".join(blocos)
-
-
-def buscar_logo_uri(service):
-    id_logo = buscar_id_por_nome(service, "LOGO", ID_PASTA_MARCA)
-    if not id_logo:
-        return None
-    results = service.files().list(
-        q=f"'{id_logo}' in parents and trashed = false",
-        fields="files(id, name)",
-        supportsAllDrives=True,
-        includeItemsFromAllDrives=True,
-    ).execute()
-    for f in results.get("files", []):
-        if Path(f["name"]).suffix.lower() in {".png", ".jpg", ".jpeg", ".svg", ".webp"}:
-            return obter_ativo_marca_base64(service, "LOGO", f["name"])
+    extensoes = {".png", ".jpg", ".jpeg", ".svg", ".webp"}
+    for arquivo in logo_dir.iterdir():
+        if arquivo.suffix.lower() in extensoes:
+            return arquivo.as_uri()
     return None
 
 
-def carregar_icone_base64(service, nome_arquivo, cor=None):
-    id_sub = buscar_id_por_nome(service, "ICONES", ID_PASTA_MARCA)
-    if not id_sub:
-        return ""
-    id_arq = buscar_id_por_nome(service, nome_arquivo, id_sub)
-    if not id_arq:
-        return ""
-   
-    fh = baixar_arquivo_bytes(service, id_arq)
-    if not fh:
-        return ""
-   
-    svg = fh.read().decode("utf-8")
-    if cor:
-        for antigo in ["currentColor", "#000000", "#000", "black", "#111111", "#1a1a1a"]:
-            svg = svg.replace(antigo, cor)
-           
-    import base64
-    encoded = base64.b64encode(svg.encode("utf-8")).decode("utf-8")
-    return f"data:image/svg+xml;base64,{encoded}"
-
-
-def icone_pin(service, cor):
-    svg_uri = carregar_icone_base64(service, "localizacao.svg", cor)
-    if svg_uri:
-        return f'<img src="{svg_uri}" style="width: 21px; height: 21px; vertical-align: middle;">'
-    return f"""
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-         stroke="{cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"></path>
-        <circle cx="12" cy="10" r="3"></circle>
-    </svg>
-    """
+def fonte_local(subpasta, nome_arquivo):
+    caminho = SCRIPT_DIR / "marca" / "fontes" / subpasta / nome_arquivo
+    if caminho.exists():
+        return caminho.as_uri()
+    return ""
 
 
 def normalizar(texto):
@@ -236,458 +162,400 @@ def normalizar(texto):
     return " ".join(str(texto).strip().upper().split())
 
 
-def ler_dados_sheets(sheets, codigo):
-    result = sheets.spreadsheets().values().get(
-        spreadsheetId=SPREADSHEET_ID,
-        range=f"'{NOME_ABA}'!A:Z",
-    ).execute()
-    rows = result.get("values", [])
-    if not rows:
+def ler_dados_sheets(sheets, codigo_imovel):
+    try:
+        result = sheets.spreadsheets().values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f"'{NOME_ABA}'!A:Z",
+        ).execute()
+        rows = result.get("values", [])
+        if not rows:
+            return {}
+
+        cabecalho = [normalizar(h) for h in rows[0]]
+        codigo_busca = normalizar(codigo_imovel)
+
+        for row in rows[1:]:
+            if not row:
+                continue
+            while len(row) < len(cabecalho):
+                row.append("")
+            if normalizar(row[0]) == codigo_busca:
+                dados = {}
+                for i, chave in enumerate(cabecalho):
+                    dados[chave] = row[i] if i < len(row) else ""
+                return dados
         return {}
-    cab = [normalizar(h) for h in rows[0]]
-    cod = normalizar(codigo)
-    for row in rows[1:]:
-        if not row:
-            continue
-        while len(row) < len(cab):
-            row.append("")
-        if normalizar(row[0]) == cod:
-            return {cab[i]: row[i] for i in range(len(cab))}
-    return {}
+    except Exception as e:
+        print(f"Erro ao ler Google Sheets: {e}", flush=True)
+        return {}
 
 
 def get_dado(dados, *chaves, default="-"):
-    for c in chaves:
-        v = dados.get(normalizar(c), "")
-        if v not in ("", None):
-            return v
+    for chave in chaves:
+        valor = dados.get(normalizar(chave), "")
+        if valor not in ("", None):
+            return valor
     return default
 
 
-def carregar_fotos_base64(drive, codigo):
-    id_imovel = obter_id_pasta_imovel(drive, codigo)
-    if not id_imovel:
-        return []
-   
-    id_fotos = buscar_id_por_nome(drive, "FOTOS TRATADAS", id_imovel)
-    if not id_fotos:
-        id_fotos = buscar_id_por_nome(drive, "FOTOS SELECIONADAS", id_imovel)
-    if not id_fotos:
-        id_fotos = id_imovel
-
-    files = []
-    token = None
-    while True:
-        resp = drive.files().list(
-            q=f"'{id_fotos}' in parents and trashed = false",
-            fields="nextPageToken, files(id, name, mimeType)",
-            orderBy="name",
-            pageToken=token,
-            supportsAllDrives=True,
-            includeItemsFromAllDrives=True,
-        ).execute()
-        files.extend(resp.get("files", []))
-        token = resp.get("nextPageToken")
-        if not token:
-            break
-
-    import base64
-    fotos_uris = []
-    for f in sorted(files, key=lambda x: x["name"].lower()):
-        mime = f.get("mimeType", "")
-        if not mime.startswith("image/"):
-            continue
-        fh = baixar_arquivo_bytes(drive, f["id"])
-        if fh:
-            encoded = base64.b64encode(fh.read()).decode("utf-8")
-            fotos_uris.append(f"data:{mime};base64,{encoded}")
-    return fotos_uris
-
-
-def renderizar_png(html_string, caminho_saida, largura, altura):
-    caminho_saida = Path(caminho_saida)
-    caminho_saida.parent.mkdir(parents=True, exist_ok=True)
-    pdf_temp = caminho_saida.parent / f"_tmp_{caminho_saida.stem}.pdf"
-
-    HTML(string=html_string).write_pdf(str(pdf_temp))
-    doc = fitz.open(str(pdf_temp))
-    page = doc[0]
-    matriz = fitz.Matrix(largura / page.rect.width, altura / page.rect.height)
-    pix = page.get_pixmap(matrix=matriz, alpha=False)
-    pix.save(str(caminho_saida))
-    doc.close()
-    try:
-        pdf_temp.unlink()
-    except Exception:
-        pass
-
-
-def css_card_principal():
-    return f"""
-    .card-fundo {{
-        position: absolute; left: 0; bottom: 0px;
-        width: 775px; height: 397px; background: {COR_OFF_WHITE}; z-index: 2;
-    }}
-    .card-azul {{
-        position: absolute; left: 0; bottom: 36px;
-        width: 875px; height: 341px; background: {COR_AZUL_ESCURO};
-        z-index: 3; padding: 48px 55px 38px 55px; color: {COR_OFF_WHITE};
-    }}
-    .card-conteudo {{ position: relative; z-index: 5; }}
-    """
-
-
-# =============================================================================
-# LAMINAS (Mesmos layouts mantidos, com dados via base64/URI)
-# =============================================================================
-def gerar_lamina_capa(ctx, destino):
-    nome_html = f"<span class='nome'>{ctx['titulo_3']}</span>" if ctx["titulo_3"] else ""
-    html = f"""
-    <html><head><meta charset="UTF-8"><style>
-    {ctx['css_fontes']}
-    @page {{ size: 1080px 1350px; margin: 0; }}
-    * {{ box-sizing: border-box; }}
-    body {{
-        margin: 0; width: 1080px; height: 1350px;
-        background: {COR_OFF_WHITE}; overflow: hidden;
-        font-family: 'Manrope', Arial, sans-serif;
-    }}
-    .foto {{
-        position: absolute; top: 0; left: 0; width: 1080px; height: 1350px;
-        padding: 20px; box-sizing: border-box; object-fit: contain; display: block;
-    }}
-    {css_card_principal()}
-    .titulo {{ font-size: 39px; line-height: 1.15; margin: 0; }}
-    .tipo {{
-        font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 38px; font-weight: 500; letter-spacing: 2px;
-        text-transform: uppercase; color: {COR_OFF_WHITE}; margin: 0;
-    }}
-    .destaque {{
-        font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 45px; font-weight: 500; letter-spacing: 2px;
-        text-transform: uppercase; margin: 0; color: {COR_OFF_WHITE};
-    }}
-    .nome {{
-        display: block; margin-top: 4px; font-family: 'Manrope', Arial, sans-serif;
-        font-size: 28px; font-weight: 400; color: {COR_OFF_WHITE}; letter-spacing: .5px;
-    }}
-    .local {{
-        font-family: 'Manrope', Arial, sans-serif; font-weight: 400;
-        margin-top: 24px; font-size: 18px; letter-spacing: 1px;
-        text-transform: uppercase; color: {COR_AZUL_SUAVE};
-        display: flex; align-items: center; gap: 9px;
-    }}
-    .valor {{
-        margin-top: 23px; font-size: 43px; font-weight: 600;
-        color: {COR_OFF_WHITE}; letter-spacing: .5px;
-    }}
-    .linha {{
-        width: 100%; height: 1px; background: {COR_LINHA};
-        margin-top: 27px; margin-bottom: 19px;
-    }}
-    .rodape {{ font-size: 13px; letter-spacing: 1.8px; width: 100%; }}
-    .marca {{ float: left; color: {COR_OFF_WHITE}; font-weight: 600; }}
-    .deslize {{ float: right; color: {COR_AZUL_SUAVE}; font-weight: 500; }}
-    .clear {{ clear: both; }}
-    </style></head><body>
-        <img class="foto" src="{ctx['foto_capa']}">
-        <div class="card-fundo"></div>
-        <div class="card-azul">
-            <div class="card-conteudo">
-                <div class="titulo">
-                    <span class="tipo">{ctx['titulo_1']}</span>
-                    <span class="destaque">{ctx['titulo_2']}</span>
-                    {nome_html}
-                </div>
-                <div class="local">
-                    {ctx['pin']}
-                    <span>{ctx['bairro']} • {ctx['cidade']}</span>
-                </div>
-                <div class="valor">{ctx['valor']}</div>
-                <div class="linha"></div>
-                <div class="rodape">
-                    <span class="marca">CARVALHO FERREIRA</span>
-                    <span class="deslize">DESLIZE PARA CONHECER</span>
-                    <div class="clear"></div>
+HTML_LAYOUT = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @font-face {
+            font-family: 'Cormorant Garamond';
+            src: url('{{ fonte_cormorant_medium }}');
+            font-weight: 500;
+        }
+        @font-face {
+            font-family: 'Cormorant Garamond';
+            src: url('{{ fonte_cormorant_semibold }}');
+            font-weight: 600;
+        }
+        @font-face {
+            font-family: 'Manrope';
+            src: url('{{ fonte_manrope_regular }}');
+            font-weight: 400;
+        }
+        @font-face {
+            font-family: 'Manrope';
+            src: url('{{ fonte_manrope_medium }}');
+            font-weight: 500;
+        }
+        @font-face {
+            font-family: 'Manrope';
+            src: url('{{ fonte_manrope_semibold }}');
+            font-weight: 600;
+        }
+        @page { size: A4; margin: 0; }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 0; font-family: 'Manrope', sans-serif; background: #f4f1ea; color: #1a1a1a; }
+        .page { width: 210mm; height: 297mm; position: relative; overflow: hidden; background: #f4f1ea; }
+        .sidebar-bg { position: absolute; top: 0; left: 0; width: 37%; height: 100%; background: #06192a; z-index: 1; }
+        .photo-bg { position: absolute; top: 0; right: 0; width: 64%; height: 62%; overflow: hidden; z-index: 1; }
+        .photo-bg img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .sidebar-content { position: absolute; top: 0; left: 0; width: 36%; height: 60%; padding: 42px 24px 20px 24px; z-index: 2; overflow: hidden; }
+        .logo-container { width: 100%; text-align: center; margin-bottom: 28px; }
+        .logo-img { max-width: 151.8px; max-height: 79.2px; object-fit: contain; display: block; margin: 0 auto 14px auto; }
+        .logo-symbol { font-size: 28pt; font-weight: 300; color: #e2e8f0; letter-spacing: -2px; margin-bottom: 2px; }
+        .logo-title { font-family: 'Cormorant Garamond', serif; font-size: 15.5pt; letter-spacing: 2.8px; font-weight: 500; line-height: 1.18; color: #F7F5F0; text-transform: uppercase; }
+        .logo-divider { width: 45px; height: 1px; background: #F7F5F0; margin: 8px auto 7px auto; }
+        .logo-subtitle { font-size: 8pt; letter-spacing: 1.8px; color: #94a3b8; margin-top: 6px; text-transform: uppercase; }
+        .header-info { width: 100%; margin-top: 4px; }
+        .tipo-imovel { font-family: 'Cormorant Garamond', serif; width: 100%; font-size: 17pt; font-weight: 500; letter-spacing: 1.3px; color: #94a3b8; margin: 0; line-height: 1; }
+        .destaque-imovel { font-family: 'Cormorant Garamond', serif; width: 100%; font-size: 25pt; font-weight: 600; letter-spacing: 1.2px; margin-top: 3px; color: #F7F5F0; line-height: 1; overflow-wrap: anywhere; }
+        .nome-imovel { width: 100%; font-size: 13pt; color: #F7F5F0; font-weight: 300; margin-top: 8px; letter-spacing: 0.8px; overflow-wrap: anywhere; }
+        .valor-imovel { font-size: 24pt; font-weight: 600; color: #F7F5F0; letter-spacing: 0.8px; margin-top: 50px; margin-bottom: 4px; text-align: center; width: 100%; }
+        .location-container { width: 100%; display: flex; align-items: flex-end; margin-top: 150px; margin-bottom: 6px; }
+        .location-icon-box { width: 35px; height: 35px; margin-right: 8px; flex-shrink: 0; margin-top: 1px; }
+        .location-icon-box svg { width: 100%; height: 100%; }
+        .localizacao-topo { min-width: 0; font-size: 8.5pt; letter-spacing: 0.8px; color: #94a3b8; text-transform: uppercase; line-height: 1.4; overflow-wrap: anywhere; }
+        .specs-card { position: absolute; top: 56.5%; left: 5.5%; width: 33.5%; height: 35.5%; background: #06192a; border: 1px solid #1e2d3d; border-radius: 2px; padding: 24px 18px; color: white; box-shadow: -4px -4px 14px rgba(0, 0, 0, 0.18); z-index: 10; display: flex; flex-direction: column; justify-content: space-around; }
+        .spec-row { display: flex; align-items: center; min-width: 0; width: 100%; }
+        .spec-icon-box { width: 32px; height: 32px; margin-right: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+        .spec-icon-box svg { width: 25px !important; height: 25px !important; }
+        .spec-text-box { min-width: 0; display: flex; flex-direction: column; }
+        .spec-label { font-size: 10pt; letter-spacing: 1px; color: #94a3b8; text-transform: uppercase; font-weight: 500; line-height: 1.15; }
+        .spec-value { font-size: 13.5pt; font-weight: 400; margin-top: 3px; color: #ffffff; letter-spacing: 0.3px; line-height: 1.1; overflow-wrap: anywhere; }
+        .spec-divider { height: 1px; background: #1a2b3c; width: 100%; flex-shrink: 0; }
+        .details-area { position: absolute; top: 62%; right: 0; width: 62%; height: 31%; padding: 20px 40px 10px 45px; z-index: 2; display: flex; flex-direction: column; justify-content: space-between; }
+        .description-wrapper { border-left: 2px solid #06192a; padding-left: 16px; margin-top: 5px; }
+        .diferencial-destaque { font-size: 10pt; font-weight: 600; color: #06192a; letter-spacing: 1.1px; text-transform: uppercase; margin-bottom: 10px; display: block; line-height: 1.25; }
+        .description { font-size: 10pt; line-height: 1.45; color: #2d3748; font-weight: 400; }
+        .features-grid { width: 100%; display: flex; justify-content: space-between; align-items: flex-start; padding: 5px 6px 0 6px; }
+        .feature-item { width: 25%; min-width: 0; text-align: center; display: flex; flex-direction: column; align-items: center; }
+        .feature-icon-box { width: 28px; height: 28px; margin-bottom: 7px; flex-shrink: 0; }
+        .feature-icon-box svg { width: 100%; height: 100%; }
+        .feature-value { font-size: 14pt; font-weight: bold; color: #06192a; line-height: 1; min-height: 14pt; }
+        .feature-label { font-size: 9pt; letter-spacing: 0.8px; color: #94a3b8; margin-top: 5px; text-transform: uppercase; font-weight: 700; line-height: 1.15; }
+        .footer-line { position: absolute; bottom: 45px; left: 5%; width: 90%; border-top: 1px solid #94a3b8; z-index: 2; }
+        .footer-content { position: absolute; bottom: 15px; left: 5%; width: 90%; display: flex; justify-content: space-between; align-items: flex-end; font-size: 8pt; color: #94a3b8; letter-spacing: 0.5px; z-index: 2; }
+        .footer-brand { font-weight: bold; color: #06192a; font-size: 9pt; letter-spacing: 1px; }
+        .page-break { page-break-before: always; height: 297mm; width: 210mm; box-sizing: border-box; padding: 20mm; background: #f4f1ea; display: flex; flex-direction: column; justify-content: space-between; }
+        .full-photo { width: 100%; height: 230mm; object-fit: contain; display: block; }
+        .page-footer { border-top: 1px solid #06192a; padding-top: 12px; display: flex; justify-content: space-between; font-size: 11pt; font-weight: bold; color: #06192a; }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="sidebar-bg"></div>
+        <div class="photo-bg"><img src="{{ foto_capa }}" alt="Capa"></div>
+        <div class="sidebar-content">
+            <div class="logo-container">
+                {% if logo_uri %}
+                    <img class="logo-img" src="{{ logo_uri }}" alt="Carvalho Ferreira">
+                {% else %}
+                    <div class="logo-symbol">| •</div>
+                {% endif %}
+                <div class="logo-title">CARVALHO<br>FERREIRA</div>
+                <div class="logo-divider"></div>
+                <div class="logo-subtitle">CONSULTORIA IMOBILIARIA</div>
+            </div>
+            <div class="header-info">
+                <h1 class="tipo-imovel">{{ titulo_1 }}</h1>
+                <h1 class="destaque-imovel">{{ titulo_2 }}</h1>
+                <div class="nome-imovel">{{ titulo_3 }}</div>
+                {% if valor and valor != '-' %}
+                <div class="valor-imovel">{{ valor }}</div>
+                {% endif %}
+                <div class="location-container">
+                    <div class="location-icon-box">{{ svg_localizacao | safe }}</div>
+                    <div class="localizacao-topo">{{ bairro }}<br>{{ cidade_uf }}</div>
                 </div>
             </div>
         </div>
-    </body></html>
-    """
-    renderizar_png(html, destino, 1080, 1350)
-
-
-def gerar_lamina_foto(ctx, destino, foto):
-    html = f"""
-    <html><head><meta charset="UTF-8"><style>
-    {ctx['css_fontes']}
-    @page {{ size: 1080px 1350px; margin: 0; }}
-    * {{ box-sizing: border-box; }}
-    body {{
-        margin: 0; width: 1080px; height: 1350px;
-        background: {COR_OFF_WHITE}; overflow: hidden; font-family: 'Manrope', Arial, sans-serif;
-    }}
-    .foto {{ position: absolute; top: 0; left: 0; width: 1080px; height: 1350px; object-fit: cover; }}
-    .barra-inferior {{
-        position: absolute; bottom: 0; left: 0; width: 100%; height: 90px;
-        background: {COR_AZUL_ESCURO}; color: {COR_OFF_WHITE}; padding: 31px 55px;
-    }}
-    .marca {{ font-size: 13px; font-weight: 600; letter-spacing: 2px; }}
-    </style></head><body>
-        <img class="foto" src="{foto}">
-        <div class="barra-inferior">
-            <div class="marca">CARVALHO FERREIRA</div>
-        </div>
-    </body></html>
-    """
-    renderizar_png(html, destino, 1080, 1350)
-
-
-def gerar_lamina_ficha(ctx, destino):
-    html = f"""
-    <html><head><meta charset="UTF-8"><style>
-    {ctx['css_fontes']}
-    @page {{ size: 1080px 1350px; margin: 0; }}
-    * {{ box-sizing: border-box; }}
-    body {{
-        margin: 0; width: 1080px; height: 1350px; padding: 70px 65px;
-        background: {COR_AZUL_ESCURO}; color: {COR_OFF_WHITE};
-        font-family: 'Manrope', Arial, sans-serif; overflow: hidden;
-    }}
-    .titulo {{
-        font-size: 39px; font-weight: 500; letter-spacing: 2px;
-        color: {COR_OFF_WHITE}; margin-bottom: 55px;
-    }}
-    .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 22px; width: 100%; }}
-    .card {{
-        height: 245px; background: {COR_AZUL_BLOCO}; padding: 30px 32px;
-        color: {COR_OFF_WHITE}; position: relative; overflow: hidden;
-    }}
-    .card::after {{
-        content: ""; position: absolute; bottom: 0; right: 0;
-        width: 55px; height: 55px; background: {COR_OFF_WHITE}; opacity: .08;
-    }}
-    .icone {{ height: 34px; margin-bottom: 26px; }}
-    .label {{
-        font-size: 15px; letter-spacing: 2px; text-transform: uppercase;
-        color: {COR_AZUL_SUAVE}; font-weight: 500;
-    }}
-    .valor {{
-        margin-top: 9px; font-size: 37px; font-weight: 600;
-        color: {COR_OFF_WHITE}; line-height: 1;
-    }}
-    .rodape {{
-        position: absolute; left: 65px; right: 65px; bottom: 50px;
-        padding-top: 22px; border-top: 1px solid #D8DDE2;
-        font-size: 13px; letter-spacing: 2px; color: {COR_AZUL_SUAVE}; text-transform: uppercase;
-    }}
-    </style></head><body>
-        <div class="titulo">ESPECIFICACOES</div>
-        <div class="grid">
-            <div class="card"><div class="icone">{ctx['svg_dorm']}</div><div class="label">Dormitorios</div><div class="valor">{ctx['dormitorios']}</div></div>
-            <div class="card"><div class="icone">{ctx['svg_suites']}</div><div class="label">Suites</div><div class="valor">{ctx['suites']}</div></div>
-            <div class="card"><div class="icone">{ctx['svg_banheiros']}</div><div class="label">Banheiros</div><div class="valor">{ctx['banheiros']}</div></div>
-            <div class="card"><div class="icone">{ctx['svg_vagas']}</div><div class="label">Vagas</div><div class="valor">{ctx['vagas']}</div></div>
-            <div class="card"><div class="icone">{ctx['svg_area']}</div><div class="label">Area util</div><div class="valor">{ctx['area']}</div></div>
-            <div class="card"><div class="icone">{ctx['svg_terreno']}</div><div class="label">Area do terreno</div><div class="valor">{ctx['terreno']}</div></div>
-        </div>
-        <div class="rodape">CARVALHO FERREIRA • CONSULTORIA IMOBILIARIA</div>
-    </body></html>
-    """
-    renderizar_png(html, destino, 1080, 1350)
-
-
-def gerar_lamina_final(ctx, destino):
-    logo_html = f'<img class="logo" src="{ctx["logo_uri"]}">' if ctx.get("logo_uri") else ""
-    html = f"""
-    <html><head><meta charset="UTF-8"><style>
-    {ctx['css_fontes']}
-    @page {{ size: 1080px 1350px; margin: 0; }}
-    * {{ box-sizing: border-box; }}
-    body {{
-        margin: 0; width: 1080px; height: 1350px; background: {COR_AZUL_ESCURO};
-        font-family: 'Manrope', Arial, sans-serif; text-align: center; position: relative; overflow: hidden;
-    }}
-    .topo {{ position: absolute; top: 100px; left: 80px; right: 80px; }}
-    .logo {{ max-width: 300px; max-height: 125px; display: block; margin: 0 auto 22px; }}
-    .submarca {{ font-size: 15px; letter-spacing: 3px; color: {COR_OFF_WHITE}; text-transform: uppercase; font-weight: 600; }}
-    .centro {{ position: absolute; top: 50%; left: 80px; right: 80px; transform: translateY(-35%); }}
-    .titulo {{
-        font-family: 'Cormorant Garamond', Georgia, serif; font-size: 55px; line-height: 1.2;
-        color: {COR_OFF_WHITE}; font-weight: 600; letter-spacing: 1px;
-    }}
-    .linha {{ width: 75px; height: 2px; background: {COR_OFF_WHITE}; margin: 30px auto 0; }}
-    </style></head><body>
-        <div class="topo">{logo_html}<div class="submarca">CARVALHO FERREIRA • CONSULTORIA IMOBILIARIA</div></div>
-        <div class="centro"><div class="titulo">TALVEZ ESTE SEJA O IMOVEL.<br>QUE VOCE ESTAVA PROCURANDO.</div><div class="linha"></div></div>
-    </body></html>
-    """
-    renderizar_png(html, destino, 1080, 1350)
-
-
-def gerar_thumbnail(ctx, destino):
-    nome_html = f"<span class='nome'>{ctx['titulo_3']}</span>" if ctx["titulo_3"] else ""
-    html = f"""
-    <html><head><meta charset="UTF-8"><style>
-    {ctx['css_fontes']}
-    @page {{ size: 1080px 1350px; margin: 0; }}
-    * {{ box-sizing: border-box; }}
-    body {{
-        margin: 0; width: 1080px; height: 1350px; background: {COR_OFF_WHITE}; overflow: hidden; font-family: 'Manrope', Arial, sans-serif;
-    }}
-    .foto {{ position: absolute; top: 0; left: 0; width: 1080px; height: 1350px; padding: 20px; box-sizing: border-box; object-fit: contain; }}
-    {css_card_principal()}
-    .card-azul {{ padding: 48px 55px 38px 55px; }}
-    .titulo {{ font-size: 38px; line-height: 1.15; }}
-    .tipo {{ font-family: 'Cormorant Garamond', Georgia, serif; font-size: 36px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; color: {COR_OFF_WHITE}; }}
-    .destaque {{ font-family: 'Cormorant Garamond', Georgia, serif; font-size: 45px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; margin: 0; color: {COR_OFF_WHITE}; }}
-    .nome {{ display: block; margin-top: 3px; font-size: 27px; font-weight: 400; color: {COR_OFF_WHITE}; }}
-    .local {{ margin-top: 20px; font-size: 17px; letter-spacing: 1px; text-transform: uppercase; color: {COR_AZUL_SUAVE}; display: flex; align-items: center; gap: 8px; }}
-    .valor {{ margin-top: 19px; font-size: 42px; font-weight: 600; color: {COR_OFF_WHITE}; }}
-    .marca {{ margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.3); font-size: 13px; letter-spacing: 2px; font-weight: 600; color: {COR_OFF_WHITE}; }}
-    </style></head><body>
-        <img class="foto" src="{ctx['foto_capa']}">
-        <div class="card-fundo"></div>
-        <div class="card-azul">
-            <div class="card-conteudo">
-                <div class="titulo"><span class="tipo">{ctx['titulo_1']}</span><span class="destaque">{ctx['titulo_2']}</span>{nome_html}</div>
-                <div class="local">{ctx['pin']}<span>{ctx['bairro']} • {ctx['cidade']}</span></div>
-                <div class="valor">{ctx['valor']}</div>
-                <div class="marca">CARVALHO FERREIRA</div>
+        <div class="specs-card">
+            <div class="spec-row">
+                <div class="spec-icon-box">{{ svg_campo1 | safe }}</div>
+                <div class="spec-text-box">
+                    <span class="spec-label">{{ label_campo1 }}</span>
+                    <span class="spec-value">{{ valor_campo1 }}</span>
+                </div>
+            </div>
+            <div class="spec-divider"></div>
+            <div class="spec-row">
+                <div class="spec-icon-box">{{ svg_campo2 | safe }}</div>
+                <div class="spec-text-box">
+                    <span class="spec-label">{{ label_campo2 }}</span>
+                    <span class="spec-value">{{ valor_campo2 }}</span>
+                </div>
+            </div>
+            <div class="spec-divider"></div>
+            <div class="spec-row">
+                <div class="spec-icon-box">{{ svg_campo3 | safe }}</div>
+                <div class="spec-text-box">
+                    <span class="spec-label">{{ label_campo3 }}</span>
+                    <span class="spec-value">{{ valor_campo3 }}</span>
+                </div>
             </div>
         </div>
-    </body></html>
-    """
-    renderizar_png(html, destino, 1080, 1350)
-
-
-def gerar_stories(ctx, pasta, fotos):
-    gerados = []
-    for indice, foto in enumerate(fotos[:4], start=1):
-        nome_html = f"<span class='nome'>{ctx['titulo_3']}</span>" if ctx["titulo_3"] else ""
-        html = f"""
-        <html><head><meta charset="UTF-8"><style>
-        {ctx['css_fontes']}
-        @page {{ size: 1080px 1920px; margin: 0; }}
-        * {{ box-sizing: border-box; }}
-        body {{ margin: 0; width: 1080px; height: 1920px; background: {COR_OFF_WHITE}; overflow: hidden; font-family: 'Manrope', Arial, sans-serif; }}
-        .foto {{ position: absolute; top: 0; left: 0; width: 1080px; height: 1920px; object-fit: cover; }}
-        .card-fundo {{ position: absolute; left: 0; bottom: 70px; width: 780px; height: 450px; background: {COR_OFF_WHITE}; z-index: 2; }}
-        .card-azul {{ position: absolute; left: 0; bottom: 51px; width: 900px; height: 431px; background: {COR_AZUL_ESCURO}; z-index: 3; padding: 60px 62px 45px 62px; color: {COR_OFF_WHITE}; }}
-        .titulo {{ font-size: 43px; line-height: 1.15; }}
-        .tipo {{ font-family: 'Cormorant Garamond', Georgia, serif; font-size: 36px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; margin: 0; }}
-        .destaque {{ font-family: 'Cormorant Garamond', Georgia, serif; font-size: 45px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; margin: 0; color: {COR_OFF_WHITE}; }}
-        .nome {{ display: block; margin-top: 5px; font-size: 30px; color: {COR_OFF_WHITE}; font-weight: 400; }}
-        .local {{ margin-top: 25px; font-size: 20px; letter-spacing: 1px; text-transform: uppercase; color: {COR_AZUL_SUAVE}; display: flex; align-items: center; gap: 9px; }}
-        .valor {{ margin-top: 23px; font-size: 52px; font-weight: 600; color: {COR_OFF_WHITE}; }}
-        .info {{ margin-top: 25px; font-size: 20px; font-weight: 500; color: #E2E8F0; display: flex; gap: 28px; flex-wrap: wrap; }}
-        .marca {{ margin-top: 30px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.3); font-size: 14px; letter-spacing: 2px; font-weight: 600; }}
-        </style></head><body>
-            <img class="foto" src="{foto}">
-            <div class="card-fundo"></div>
-            <div class="card-azul">
-                <div class="titulo"><span class="tipo">{ctx['titulo_1']}</span><span class="destaque">{ctx['titulo_2']}</span>{nome_html}</div>
-                <div class="local">{ctx['pin']}<span>{ctx['bairro']} • {ctx['cidade']}</span></div>
-                <div class="valor">{ctx['valor']}</div>
-                <div class="info"><div>{ctx['dormitorios']} dorm.</div><div>{ctx['vagas']} vagas</div><div>{ctx['area']} const.</div></div>
-                <div class="marca">CARVALHO FERREIRA</div>
+        <div class="details-area">
+            <div class="description-wrapper">
+                {% if observacao and observacao != '-' %}
+                    <span class="diferencial-destaque">OBS: {{ observacao }}</span>
+                {% endif %}
+                <div class="description">{{ descricao }}</div>
             </div>
-        </body></html>
-        """
-        dest = pasta / f"story_{ctx['codigo']}_{indice:02d}.png"
-        renderizar_png(html, dest, 1080, 1920)
-        gerados.append(dest)
-    return gerados
+            <div class="features-grid">
+                <div class="feature-item">
+                    <div class="feature-icon-box">{{ svg_dormitorios | safe }}</div>
+                    <div class="feature-value">{{ dormitorios }}</div>
+                    <div class="feature-label">Dormitorios</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon-box">{{ svg_banheiros | safe }}</div>
+                    <div class="feature-value">{{ banheiros }}</div>
+                    <div class="feature-label">Banheiros</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon-box">{{ svg_suites | safe }}</div>
+                    <div class="feature-value">{{ suites }}</div>
+                    <div class="feature-label">Suites</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon-box">{{ svg_vagas | safe }}</div>
+                    <div class="feature-value">{{ vagas }}</div>
+                    <div class="feature-label">Vagas</div>
+                </div>
+            </div>
+        </div>
+        <div class="footer-line"></div>
+        <div class="footer-content">
+            <div>
+                <div class="footer-brand">CARVALHO FERREIRA</div>
+                <div style="font-size: 7.5pt; color: #718096; margin-top: 2px;">TRANSFORMA NEGOCIOS EM CONQUISTAS.</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-weight: bold; color: #06192a;">CONSULTORIA IMOBILIARIA</div>
+            </div>
+        </div>
+    </div>
+    {% for foto in fotos_galeria %}
+    <div class="page-break">
+        <img class="full-photo" src="{{ foto }}" alt="Foto">
+        <div class="page-footer">
+            <div>CARVALHO FERREIRA</div>
+            <div>CONSULTORIA IMOBILIARIA</div>
+        </div>
+    </div>
+    {% endfor %}
+</body>
+</html>
+"""
 
 
-# =============================================================================
-# EXECUTAVEL PRINCIPAL (Em ambiente seguro temporário)
-# =============================================================================
-def gerar_posts(codigo_imovel):
+def sanitizar_nome_arquivo(nome):
+    return re.sub(r'[\\/*?:"<>|]', "", str(nome)).strip()
+
+
+def gerar_pdf(codigo_imovel):
     drive, sheets = conectar_google()
     if not drive or not sheets:
         return None
 
-    codigo = codigo_imovel.strip().upper()
-    dados = ler_dados_sheets(sheets, codigo)
+    codigo_imovel = codigo_imovel.strip().upper()
+    if not codigo_imovel:
+        return None
+
+    dados = ler_dados_sheets(sheets, codigo_imovel)
     if not dados:
-        print(f"Imovel '{codigo}' nao encontrado no Google Sheets.", flush=True)
         return None
 
-    fotos = carregar_fotos_base64(drive, codigo)
+    id_pasta_imovel = obter_id_pasta_imovel(drive, codigo_imovel)
+    if not id_pasta_imovel:
+        return None
+
+    id_pasta_fotos = buscar_id_por_nome(drive, "FOTOS SELECIONADAS", id_pasta_imovel)
+    if not id_pasta_fotos:
+        return None
+
+    try:
+        arquivos_fotos = []
+        page_token = None
+
+        while True:
+            resposta = drive.files().list(
+                q=f"'{id_pasta_fotos}' in parents and trashed = false",
+                fields="nextPageToken, files(id, name, mimeType, size)",
+                orderBy="name",
+                pageSize=1000,
+                pageToken=page_token,
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+            ).execute()
+
+            arquivos_fotos.extend(resposta.get("files", []))
+            page_token = resposta.get("nextPageToken")
+            if not page_token:
+                break
+
+        temp_fotos_dir = SCRIPT_DIR / "temp_fotos" / codigo_imovel
+        temp_fotos_dir.mkdir(parents=True, exist_ok=True)
+        fotos = []
+
+        for arquivo in sorted(arquivos_fotos, key=lambda x: x.get("name", "").lower()):
+            nome_f = arquivo.get("name", "")
+            mime_type = arquivo.get("mimeType", "")
+
+            if not mime_type.startswith("image/"):
+                continue
+
+            caminho_local = temp_fotos_dir / nome_f
+
+            if not caminho_local.exists():
+                if not baixar_arquivo_por_id(drive, arquivo["id"], caminho_local):
+                    continue
+
+            if caminho_local.exists():
+                fotos.append(caminho_local.as_uri())
+
+    except Exception as e:
+        print(f"Erro ao listar fotos: {e}", flush=True)
+        return None
+
     if not fotos:
-        print("Nenhuma foto encontrada.", flush=True)
         return None
 
-    # Cria diretório temporário isolado compatível com nuvem
-    temp_dir = tempfile.TemporaryDirectory()
-    pasta = Path(temp_dir.name) / codigo
-    pasta.mkdir(parents=True, exist_ok=True)
+    foto_capa = fotos[0]
+    fotos_galeria = fotos[1:] if len(fotos) > 1 else []
 
-    ctx = {
-        "codigo": codigo,
-        "css_fontes": montar_css_fontes(drive),
-        "foto_capa": fotos[0],
-        "logo_uri": buscar_logo_uri(drive) or "",
-        "pin": icone_pin(drive, COR_OFF_WHITE),
-        "titulo_1": get_dado(dados, "TITULO 1", default=""),
-        "titulo_2": get_dado(dados, "TITULO 2", default=""),
-        "titulo_3": get_dado(dados, "TITULO 3", default=""),
-        "valor": get_dado(dados, "VALOR"),
-        "bairro": get_dado(dados, "BAIRRO", default=""),
-        "cidade": get_dado(dados, "CIDADE", default=""),
-        "dormitorios": get_dado(dados, "DORMITORIOS"),
-        "suites": get_dado(dados, "SUITES", default="-"),
-        "banheiros": get_dado(dados, "BANHEIROS"),
-        "vagas": get_dado(dados, "VAGAS"),
-        "area": get_dado(dados, "AREA UTIL"),
-        "terreno": get_dado(dados, "AREA TOTAL"),
-        "svg_dorm": carregar_icone_base64(drive, "dormitorios.svg", COR_OFF_WHITE),
-        "svg_suites": carregar_icone_base64(drive, "suites.svg", COR_OFF_WHITE),
-        "svg_banheiros": carregar_icone_base64(drive, "banheiros.svg", COR_OFF_WHITE),
-        "svg_vagas": carregar_icone_base64(drive, "vagas.svg", COR_OFF_WHITE),
-        "svg_area": carregar_icone_base64(drive, "area.svg", COR_OFF_WHITE),
-        "svg_terreno": carregar_icone_base64(drive, "terreno.svg", COR_OFF_WHITE),
-    }
+    logo_uri = buscar_logo_local()
+    fonte_cormorant_medium = fonte_local("CORMORANT GARAMOND", "CormorantGaramond-Medium.ttf")
+    fonte_cormorant_semibold = fonte_local("CORMORANT GARAMOND", "CormorantGaramond-SemiBold.ttf")
+    fonte_manrope_regular = fonte_local("MANROPE", "Manrope-Regular.ttf")
+    fonte_manrope_medium = fonte_local("MANROPE", "Manrope-Medium.ttf")
+    fonte_manrope_semibold = fonte_local("MANROPE", "Manrope-SemiBold.ttf")
 
-    gerados = []
+    tipo_imovel = get_dado(dados, "TIPO", default="IMOVEL")
+    tipo_lower = tipo_imovel.lower()
 
-    dest = pasta / f"thumbnail_{codigo}.png"
-    gerar_thumbnail(ctx, dest)
-    gerados.append(dest)
+    if "apartamento" in tipo_lower:
+        label_campo1, icone_campo1 = "Area Util", "area.svg"
+        label_campo2, icone_campo2 = "Andar", "andar.svg"
+        label_campo3, icone_campo3 = "IPTU", "iptu.svg"
+    else:
+        label_campo1, icone_campo1 = "Area Util", "area.svg"
+        label_campo2, icone_campo2 = "Area do Terreno", "terreno.svg"
+        label_campo3, icone_campo3 = "IPTU", "iptu.svg"
 
-    dest = pasta / f"carrossel_{codigo}_01.png"
-    gerar_lamina_capa(ctx, dest)
-    gerados.append(dest)
+    template = Template(HTML_LAYOUT)
+    html_rendered = template.render(
+        foto_capa=foto_capa,
+        fotos_galeria=fotos_galeria,
+        logo_uri=logo_uri,
+        fonte_cormorant_medium=fonte_cormorant_medium,
+        fonte_cormorant_semibold=fonte_cormorant_semibold,
+        fonte_manrope_regular=fonte_manrope_regular,
+        fonte_manrope_medium=fonte_manrope_medium,
+        fonte_manrope_semibold=fonte_manrope_semibold,
+        svg_localizacao=carregar_icone_local("localizacao.svg", "#f4f1ea"),
+        svg_dormitorios=carregar_icone_local("dormitorios.svg", "#06192a"),
+        svg_banheiros=carregar_icone_local("banheiros.svg", "#06192a"),
+        svg_suites=carregar_icone_local("suites.svg", "#06192a"),
+        svg_vagas=carregar_icone_local("vagas.svg", "#06192a"),
+        svg_campo1=carregar_icone_local(icone_campo1, "#f4f1ea"),
+        svg_campo2=carregar_icone_local(icone_campo2, "#f4f1ea"),
+        svg_campo3=carregar_icone_local(icone_campo3, "#f4f1ea"),
+        label_campo1=label_campo1,
+        valor_campo1=get_dado(dados, label_campo1),
+        label_campo2=label_campo2,
+        valor_campo2=get_dado(dados, "ANDAR" if "apartamento" in tipo_lower else "AREA TOTAL"),
+        label_campo3=label_campo3,
+        valor_campo3=get_dado(dados, "IPTU"),
+        titulo_1=get_dado(dados, "TITULO 1", default=""),
+        titulo_2=get_dado(dados, "TITULO 2", default=""),
+        titulo_3=get_dado(dados, "TITULO 3", default=""),
+        valor=get_dado(dados, "VALOR"),
+        bairro=get_dado(dados, "BAIRRO", default=""),
+        cidade_uf=get_dado(dados, "CIDADE", default=""),
+        observacao=get_dado(dados, "OBS EXTRAS", default=""),
+        descricao=get_dado(dados, "DESCRICAO", default=""),
+        dormitorios=get_dado(dados, "DORMITORIOS"),
+        banheiros=get_dado(dados, "BANHEIROS"),
+        suites=get_dado(dados, "SUITES", default="-"),
+        vagas=get_dado(dados, "VAGAS"),
+    )
 
-    n = 2
-    for foto in fotos[1:4]:
-        dest = pasta / f"carrossel_{codigo}_{n:02d}.png"
-        gerar_lamina_foto(ctx, dest, foto)
-        gerados.append(dest)
-        n += 1
+    pdf_buffer = io.BytesIO()
+    weasyprint.HTML(
+        string=html_rendered,
+        base_url=str(SCRIPT_DIR),
+    ).write_pdf(pdf_buffer)
 
-    dest = pasta / f"carrossel_{codigo}_{n:02d}.png"
-    gerar_lamina_ficha(ctx, dest)
-    gerados.append(dest)
-    n += 1
+    pdf_bytes = pdf_buffer.getvalue()
+    if len(pdf_bytes) < 10000:
+        return None
 
-    dest = pasta / f"carrossel_{codigo}_{n:02d}.png"
-    gerar_lamina_final(ctx, dest)
-    gerados.append(dest)
+    return pdf_bytes
 
-    gerados.extend(gerar_stories(ctx, pasta, fotos))
 
-    zip_path = Path(temp_dir.name) / f"posts_{codigo}.zip"
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for arq in gerados:
-            zf.write(arq, arcname=arq.name)
+# -------------------------------------------------
+# INTERFACE STREAMLIT
+# -------------------------------------------------
+st.set_page_config(page_title="Gerador de Dossiê Imobiliário", page_icon="🏠", layout="centered")
 
-    # Lê o ZIP para bytes em memória para que o Streamlit possa disponibilizar o download sem travar na nuvem
-    with open(zip_path, "rb") as f:
-        zip_bytes = f.read()
+st.title("Gerador de Dossiê - Carvalho Ferreira")
+st.write("Digite o código do imóvel para gerar o PDF diretamente na memória.")
 
-    temp_dir.cleanup()
-    print("SUCESSO: Posts gerados na nuvem com sucesso.", flush=True)
-    return zip_bytes
+codigo_input = st.text_input("Código do Imóvel:")
+
+if st.button("Gerar Dossiê do Imóvel"):
+    if not codigo_input:
+        st.warning("Por favor, informe o código do imóvel.")
+    else:
+        with st.spinner("Buscando dados no Drive e gerando PDF..."):
+            pdf_bytes = gerar_pdf(codigo_input)
+
+            if pdf_bytes:
+                st.success("Dossiê gerado com sucesso!")
+                st.download_button(
+                    label="📥 Baixar PDF do Dossiê",
+                    data=pdf_bytes,
+                    file_name=f"{sanitizar_nome_arquivo(codigo_input)}.pdf",
+                    mime="application/pdf"
+                )
+            else:
+                st.error("Não foi possível gerar o PDF. Verifique se o código está correto, se a pasta do imóvel existe e se há fotos válidas.")
