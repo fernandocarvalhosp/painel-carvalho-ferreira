@@ -17,23 +17,6 @@ creds = service_account.Credentials.from_service_account_info(
     creds_dict, scopes=SCOPES
 )
 # -------------------------------------------------
-# CONFIGURACAO DA PAGINA
-# -------------------------------------------------
-st.set_page_config(
-    page_title="Carvalho Ferreira | Painel Operacional",
-    layout="wide",
-)
-
-SCRIPT_DIR = Path(__file__).resolve().parent
-CREDENCIAIS_FILE = SCRIPT_DIR / "config" / "credentials.json"
-
-SPREADSHEET_ID = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
-NOME_ABA = "Imoveis"
-
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-
-
-# -------------------------------------------------
 # CONEXAO GOOGLE SHEETS (ADAPTADA PARA NUVEM)
 # -------------------------------------------------
 @st.cache_resource
