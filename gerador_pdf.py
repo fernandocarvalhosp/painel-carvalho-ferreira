@@ -33,19 +33,15 @@ NOME_ABA = "Imoveis"
 # -------------------------------------------------
 # CONEXAO GOOGLE (ADAPTADA PARA NUVEM)
 # -------------------------------------------------
+@st.cache_resource
 def conectar_google():
-    try:
-        if CREDENCIAIS_FILE.exists():
-            creds = service_account.Credentials.from_service_account_file(
-                str(CREDENCIAIS_FILE), scopes=SCOPES
-            )
-        elif "gcp_service_account" in st.secrets:
-            creds = service_account.Credentials.from_service_account_info(
-                dict(st.secrets["gcp_service_account"]), scopes=SCOPES
-            )
-        else:
-            raise FileNotFoundError(f"Arquivo de credenciais não encontrado em {CREDENCIAIS_FILE}")
-
+    # Lê diretamente do Streamlit Secrets usando o nome correto que salvamos
+    creds_dict = dict(st.secrets["google_credentials"])
+    creds = service_account.Credentials.from_service_account_info(
+        creds_dict,
+        scopes=SCOPES
+    )
+    return creds
         drive = build("drive", "v3", credentials=creds)
         sheets = build("sheets", "v4", credentials=creds)
         return drive, sheets
