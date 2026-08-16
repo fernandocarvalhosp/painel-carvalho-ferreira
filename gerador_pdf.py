@@ -34,20 +34,18 @@ NOME_ABA = "Imoveis"
 # -------------------------------------------------
 @st.cache_resource
 def conectar_google():
-    # Lê diretamente do Streamlit Secrets usando o nome correto que salvamos
-    creds_dict = dict(st.secrets["google_credentials"])
-    creds = service_account.Credentials.from_service_account_info(
-        creds_dict,
-        scopes=SCOPES
-    )
-    return creds
+    try:
+        creds_dict = dict(st.secrets["google_credentials"])
+        creds = service_account.Credentials.from_service_account_info(
+            creds_dict,
+            scopes=SCOPES
+        )
         drive = build("drive", "v3", credentials=creds)
         sheets = build("sheets", "v4", credentials=creds)
         return drive, sheets
     except Exception as e:
         print(f"Erro ao autenticar no Google: {e}", flush=True)
         return None, None
-
 
 def buscar_id_por_nome(service, nome_item, id_pasta_pai):
     if not service or not id_pasta_pai:
