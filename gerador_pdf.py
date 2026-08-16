@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import io
 import re
-from pathlib import Path
+import pathlib import path
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
