@@ -53,7 +53,7 @@ def buscar_id_por_nome(service, nome_item, id_pasta_pai):
 
     query = (
         f"'{id_pasta_pai}' in parents "
-        f"and name = '{nome_item}' "
+        f"and name = {nome_item}' "
         f"and trashed = false"
     )
     try:
@@ -78,7 +78,6 @@ def buscar_pasta_imovel_por_codigo(service, codigo_imovel, id_pasta_imoveis):
     query = (
         f"'{id_pasta_imoveis}' in parents "
         f"and mimeType = 'application/vnd.google-apps.folder' "
-        f"and name contains '{codigo}' "
         f"and trashed = false"
     )
     try:
