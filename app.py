@@ -47,7 +47,7 @@ def buscar_imovel(codigo):
             .values()
             .get(
                 spreadsheetId = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w",
-                range=f"'{Imoveis}'!A:Z",
+                range=f"'['Imoveis']'!A:Z",
             )
             .execute()
         )
@@ -85,7 +85,7 @@ def salvar_dados(codigo, novos_dados):
             .values()
             .get(
                 spreadsheetId="1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w",
-                range=f"'{Imoveis}'!A:Z",
+                range=f"'['Imoveis']'!A:Z",
             )
             .execute()
         )
@@ -93,7 +93,7 @@ def salvar_dados(codigo, novos_dados):
 
         for i, row in enumerate(rows):
             if row and normalizar(row[0]) == normalizar(codigo):
-                range_to_update = f"'{Imoveis}'!A{i + 1}:Z{i + 1}"
+                range_to_update = f"'['Imoveis']'!A{i + 1}:Z{i + 1}"
                 body = {"values": [novos_dados]}
                 service.spreadsheets().values().update(
                     spreadsheetId="1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w",
