@@ -47,7 +47,7 @@ def buscar_imovel(codigo):
             .values()
             .get(
                 spreadsheetId = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w",
-                range=f"Imoveis'!A:Z",
+                range=f"Imoveis!A:Z",
             )
             .execute()
         )
