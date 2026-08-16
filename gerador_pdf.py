@@ -580,7 +580,7 @@ st.set_page_config(
 st.title("Gerador de Dossie - Carvalho Ferreira")
 st.write("Digite o codigo do imovel para gerar o PDF e baixar no computador.")
 
-codigo_input = st.text_input("Codigo do Imovel:")
+codigo_input = st.text_input("Codigo do Imovel:", key="codigo_imovel_baixar",)
 
 if st.button("Gerar Dossie do Imovel", type="primary"):
     if not codigo_input:
