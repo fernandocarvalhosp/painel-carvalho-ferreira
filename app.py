@@ -4,7 +4,7 @@ import json
 from google.oauth2 import service_account
 import gerador_pdf
 import gerar_posts.py
-import tratador_nuvem
+import tratador_nuvem.py
 # Defina os escopos que seu aplicativo usa (ajuste se precisar de mais algum)
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
