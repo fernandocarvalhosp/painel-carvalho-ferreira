@@ -46,7 +46,7 @@ def buscar_imovel(codigo):
             service.spreadsheets()
             .values()
             .get(
-                spreadsheetId=1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w,
+                spreadsheetId = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w",
                 range=f"'{NOME_ABA}'!A:Z",
             )
             .execute()
