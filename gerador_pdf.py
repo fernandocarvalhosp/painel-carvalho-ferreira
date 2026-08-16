@@ -33,7 +33,7 @@ NOME_ABA = "Imoveis"
 # CONEXAO GOOGLE (ADAPTADA PARA NUVEM)
 # -------------------------------------------------
 @st.cache_resource
-def conectar_google():
+def conectar_google_v2():
     try:
         creds_dict = dict(st.secrets["google_credentials"])
         creds = service_account.Credentials.from_service_account_info(
