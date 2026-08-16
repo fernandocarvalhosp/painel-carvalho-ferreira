@@ -84,8 +84,8 @@ def salvar_dados(codigo, novos_dados):
             service.spreadsheets()
             .values()
             .get(
-                spreadsheetId=SPREADSHEET_ID,
-                range=f"'{NOME_ABA}'!A:Z",
+                spreadsheetId="1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w",
+                range=f"'{Imoveis}'!A:Z",
             )
             .execute()
         )
@@ -93,10 +93,10 @@ def salvar_dados(codigo, novos_dados):
 
         for i, row in enumerate(rows):
             if row and normalizar(row[0]) == normalizar(codigo):
-                range_to_update = f"'{NOME_ABA}'!A{i + 1}:Z{i + 1}"
+                range_to_update = f"'{Imoveis}'!A{i + 1}:Z{i + 1}"
                 body = {"values": [novos_dados]}
                 service.spreadsheets().values().update(
-                    spreadsheetId=SPREADSHEET_ID,
+                    spreadsheetId="1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w",
                     range=range_to_update,
                     valueInputOption="RAW",
                     body=body,
