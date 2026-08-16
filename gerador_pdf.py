@@ -78,6 +78,7 @@ def buscar_pasta_imovel_por_codigo(service, codigo_imovel, id_pasta_imoveis):
     query = (
         f"'{id_pasta_imoveis}' in parents "
         f"and mimeType = 'application/vnd.google-apps.folder' "
+        f"and name contains '{codigo}' "
         f"and trashed = false"
     )
     try:
