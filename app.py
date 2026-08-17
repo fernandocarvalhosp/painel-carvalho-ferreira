@@ -13,7 +13,7 @@ def verificar_senha():
     senha_digitada = st.text_input("Digite a senha de acesso:", type="password")
     
     if st.button("Entrar"):
-        # Compara com a senha salva nos segredos da nuvem (ou uma fixa)
+        # Compara com a senha salva nos segredos da nuvem
         if senha_digitada == st.secrets["passwords"]["senha_acesso"]:
             st.session_state["senha_correta"] = True
             st.rerun()
@@ -30,7 +30,6 @@ if not verificar_senha():
 import importlib
 from pathlib import Path
 
-import streamlit as st
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
@@ -51,8 +50,8 @@ st.set_page_config(
     layout="wide",
 )
 
-# App so precisa gravar/ler planilha
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+# Escopos e IDs para Planilha e Drive
+SCOPES_SHEETS = ["https://www.googleapis.com/auth/spreadsheets"]
 SPREADSHEET_ID = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
 NOME_ABA = "Imoveis"
 
@@ -61,7 +60,7 @@ NOME_ABA = "Imoveis"
 def conectar_sheets():
     creds_dict = dict(st.secrets["google_credentials"])
     creds = service_account.Credentials.from_service_account_info(
-        creds_dict, scopes=SCOPES
+        creds_dict, scopes=SCOPES_SHEETS
     )
     return build("sheets", "v4", credentials=creds)
 
@@ -212,7 +211,7 @@ if "dados_imovel" not in st.session_state:
     st.session_state["dados_imovel"] = None
 
 # -------------------------------------------------
-# ÁREA PRINCIPAL (Topo: Cabeçalho e Busca visíveis no celular)
+# ÁREA PRINCIPAL (Topo: Cabeçalho e Busca)
 # -------------------------------------------------
 st.title("Carvalho Ferreira")
 st.caption("Painel de gestao e geracao de materiais")
@@ -233,7 +232,6 @@ with col_busca2:
 
 codigo_digitado = (codigo_input or "").strip().upper()
 
-# Dispara a busca quando clica no botão ou altera o código e aperta Enter
 if (buscar and codigo_digitado) or (
     codigo_digitado
     and codigo_digitado != st.session_state["codigo_busca"]
@@ -260,7 +258,7 @@ if codigo_busca and dados_imovel:
     st.success(f"Imóvel **{codigo_busca}** carregado com sucesso!")
 
 # -------------------------------------------------
-# SIDEBAR (Apenas para Ações de Materiais)
+# SIDEBAR (Ações de Materiais & Tratamento de Fotos)
 # -------------------------------------------------
 st.sidebar.markdown("### Materiais & Ações")
 
@@ -325,7 +323,7 @@ if st.session_state.get("posts_resultado") is not None:
                     key="dl_posts_path",
                 )
 
-# Tratar fotos (opcional)
+# Tratar fotos (Integrado com Nuvem e Logotipo Local)
 if st.sidebar.button("Tratar fotos", use_container_width=True, key="btn_tratar"):
     if not codigo_busca:
         st.sidebar.error("Informe o codigo.")
@@ -343,15 +341,41 @@ if st.session_state.get("confirmar_tratamento"):
             else:
                 try:
                     importlib.reload(tratador_nuvem)
-                    if hasattr(tratador_nuvem, "tratar"):
-                        msg = tratador_nuvem.tratar(codigo_busca)
-                    elif hasattr(tratador_nuvem, "tratar_fotos"):
-                        msg = tratador_nuvem.tratar_fotos(codigo_busca)
+                    
+                    with st.spinner(f"Processando fotos do imóvel {codigo_busca} no Drive..."):
+                        # Conecta ao Google Drive usando os segredos da nuvem
+                        SCOPES_DRIVE = [
+                            "https://www.googleapis.com/auth/drive",
+                            "https://www.googleapis.com/auth/spreadsheets.readonly"
+                        ]
+                        creds_dict = dict(st.secrets["google_credentials"])
+                        creds = service_account.Credentials.from_service_account_info(
+                            creds_dict, scopes=SCOPES_DRIVE
+                        )
+                        service_drive = build("drive", "v3", credentials=creds)
+
+                        # Carrega a logo direto da pasta local 'marca' no GitHub/Servidor
+                        logo_path = Path("marca/logo.png")
+                        logo_bytes = None
+                        if logo_path.exists():
+                            with open(logo_path, "rb") as f:
+                                logo_bytes = f.read()
+
+                        # Executa o tratamento passando o serviço e a logo em bytes
+                        if hasattr(tratador_nuvem, "tratar"):
+                            sucesso = tratador_nuvem.tratar(codigo_busca, service=service_drive, logo_bytes=logo_bytes)
+                        elif hasattr(tratador_nuvem, "tratar_fotos"):
+                            sucesso = tratador_nuvem.tratar_fotos(codigo_busca, service=service_drive, logo_bytes=logo_bytes)
+                        else:
+                            sucesso = False
+
+                    if sucesso:
+                        st.sidebar.success(f"✅ Fotos do imóvel {codigo_busca} tratadas e enviadas para a pasta 'FOTOS TRATADAS'!")
                     else:
-                        msg = "Funcao de tratamento nao encontrada."
-                    st.sidebar.success(str(msg) if msg else "Concluido.")
+                        st.sidebar.error("❌ Falha no tratamento. Verifique a pasta do imóvel no Drive.")
+
                 except Exception as e:
-                    st.sidebar.error(str(e))
+                    st.sidebar.error(f"Erro no tratamento: {e}")
     with a2:
         if st.button("Nao", use_container_width=True, key="trat_nao"):
             st.session_state["confirmar_tratamento"] = False
@@ -364,91 +388,38 @@ tab1, tab2, tab3 = st.tabs(["Identificacao", "Dados Tecnicos", "Divulgacao"])
 with tab1:
     col_a, col_b = st.columns(2)
     with col_a:
-        novo_codigo = st.text_input(
-            "Codigo", key="f_codigo"
-        )
-        novo_tipo = st.text_input(
-            "Tipo", key="f_tipo"
-        )
-        novo_cidade = st.text_input(
-            "Cidade", key="f_cidade"
-        )
-        novo_bairro = st.text_input(
-            "Bairro", key="f_bairro"
-        )
-        novo_endereco = st.text_input(
-            "Endereco", key="f_endereco"
-        )
+        novo_codigo = st.text_input("Codigo", key="f_codigo")
+        novo_tipo = st.text_input("Tipo", key="f_tipo")
+        novo_cidade = st.text_input("Cidade", key="f_cidade")
+        novo_bairro = st.text_input("Bairro", key="f_bairro")
+        novo_endereco = st.text_input("Endereco", key="f_endereco")
     with col_b:
-        novo_proprietario = st.text_input(
-            "Proprietario",
-            key="f_proprietario",
-        )
-        novo_contato = st.text_input(
-            "Contato", key="f_contato"
-        )
-        novo_status = st.text_input(
-            "Status", key="f_status"
-        )
-        novo_exclus = st.text_input(
-            "Exclusividade", key="f_exclus"
-        )
-        novo_data = st.text_input(
-            "Data", key="f_data"
-        )
+        novo_proprietario = st.text_input("Proprietario", key="f_proprietario")
+        novo_contato = st.text_input("Contato", key="f_contato")
+        novo_status = st.text_input("Status", key="f_status")
+        novo_exclus = st.text_input("Exclusividade", key="f_exclus")
+        novo_data = st.text_input("Data", key="f_data")
 
 with tab2:
     col_d, col_e = st.columns(2)
     with col_d:
-        novo_valor = st.text_input(
-            "Valor", key="f_valor"
-        )
-        novo_area_util = st.text_input(
-            "Area Util", key="f_area_util"
-        )
-        novo_area_total = st.text_input(
-            "Area Total", key="f_area_total"
-        )
-        novo_andar = st.text_input(
-            "Andar", key="f_andar"
-        )
-        novo_iptu = st.text_input(
-            "IPTU", key="f_iptu"
-        )
+        novo_valor = st.text_input("Valor", key="f_valor")
+        novo_area_util = st.text_input("Area Util", key="f_area_util")
+        novo_area_total = st.text_input("Area Total", key="f_area_total")
+        novo_andar = st.text_input("Andar", key="f_andar")
+        novo_iptu = st.text_input("IPTU", key="f_iptu")
     with col_e:
-        novo_dormitorios = st.text_input(
-            "Dormitorios", key="f_dormitorios"
-        )
-        novo_banheiros = st.text_input(
-            "Banheiros", key="f_banheiros"
-        )
-        novo_suites = st.text_input(
-            "Suites", key="f_suites"
-        )
-        novo_vagas = st.text_input(
-            "Vagas", key="f_vagas"
-        )
+        novo_dormitorios = st.text_input("Dormitorios", key="f_dormitorios")
+        novo_banheiros = st.text_input("Banheiros", key="f_banheiros")
+        novo_suites = st.text_input("Suites", key="f_suites")
+        novo_vagas = st.text_input("Vagas", key="f_vagas")
 
 with tab3:
-    novo_titulo_1 = st.text_input(
-        "Titulo 1", key="f_titulo1"
-    )
-    novo_titulo_2 = st.text_input(
-        "Titulo 2", key="f_titulo2"
-    )
-    novo_titulo_3 = st.text_input(
-        "Titulo 3", key="f_titulo3"
-    )
-    novo_descricao = st.text_area(
-        "Descricao",
-        height=150,
-        key="f_descricao",
-    )
-    novo_obs_extras = st.text_area(
-        "Obs Extras",
-        height=100,
-        key="f_obs",
-    )
+    novo_titulo_1 = st.text_input("Titulo 1", key="f_titulo1")
+    novo_titulo_2 = st.text_input("Titulo 2", key="f_titulo2")
+    novo_titulo_3 = st.text_input("Titulo 3", key="f_titulo3")
+    novo_descricao = st.text_area("Descricao", height=150, key="f_descricao")
+    novo_obs_extras = st.text_area("Obs Extras", height=100, key="f_obs")
 
 novo_link = obter_valor(dados_imovel, "LINK")
 novo_foto = obter_valor(dados_imovel, "FOTO")
