@@ -179,21 +179,24 @@ if "dados_imovel" not in st.session_state:
     st.session_state["dados_imovel"] = None
 
 # -------------------------------------------------
-# SIDEBAR
+# ÁREA PRINCIPAL (Topo: Cabeçalho e Busca visíveis no celular)
 # -------------------------------------------------
-st.sidebar.markdown("### Selecao de Imovel")
+st.title("Carvalho Ferreira")
+st.caption("Painel de gestao e geracao de materiais")
 
-c1, c2 = st.sidebar.columns([3, 1])
-with c1:
+st.markdown("### Seleção de Imóvel")
+col_busca1, col_busca2 = st.columns([3, 1])
+
+with col_busca1:
     codigo_input = st.text_input(
-        "codigo",
+        "Código do Imóvel",
         value=st.session_state["codigo_busca"],
-        placeholder="CODIGO",
+        placeholder="Ex: CF003",
         label_visibility="collapsed",
-        key="campo_codigo_sidebar",
+        key="campo_codigo_principal",
     )
-with c2:
-    buscar = st.button("Buscar", use_container_width=True, key="btn_buscar")
+with col_busca2:
+    buscar = st.button("Buscar", use_container_width=True, type="primary", key="btn_buscar_principal")
 
 codigo_digitado = (codigo_input or "").strip().upper()
 
@@ -204,19 +207,22 @@ if (buscar and codigo_digitado) or (codigo_digitado and codigo_digitado != st.se
         with st.spinner("Buscando dados na planilha..."):
             st.session_state["dados_imovel"] = buscar_imovel(codigo_digitado)
         if st.session_state["dados_imovel"] is None:
-            st.sidebar.warning(f"Registro {codigo_digitado} nao localizado.")
+            st.warning(f"Registro {codigo_digitado} nao localizado.")
     st.rerun()
 
 codigo_busca = st.session_state.get("codigo_busca", "").strip().upper()
 dados_imovel = st.session_state.get("dados_imovel", None)
 
-if codigo_busca:
-    st.sidebar.caption(codigo_busca)
+if codigo_busca and dados_imovel:
+    st.success(f"Imóvel **{codigo_busca}** carregado com sucesso!")
 
-st.sidebar.markdown("### Materiais")
+# -------------------------------------------------
+# SIDEBAR (Apenas para Ações de Materiais)
+# -------------------------------------------------
+st.sidebar.markdown("### Materiais & Ações")
 
 # PDF
-if st.sidebar.button("Gerar PDF", use_container_width=True, type="primary", key="btn_pdf"):
+if st.sidebar.button("Gerar PDF", use_container_width=True, key="btn_pdf"):
     if not codigo_busca:
         st.sidebar.error("Informe o codigo.")
     else:
@@ -307,13 +313,9 @@ if st.session_state.get("confirmar_tratamento"):
         if st.button("Nao", use_container_width=True, key="trat_nao"):
             st.session_state["confirmar_tratamento"] = False
 
-
 # -------------------------------------------------
-# AREA PRINCIPAL
+# ABAS DE CONTEÚDO PRINCIPAL
 # -------------------------------------------------
-st.title("Carvalho Ferreira")
-st.caption("Painel de gestao e geracao de materiais")
-
 tab1, tab2, tab3 = st.tabs(["Identificacao", "Dados Tecnicos", "Divulgacao"])
 
 with tab1:
