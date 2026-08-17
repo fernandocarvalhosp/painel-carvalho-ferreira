@@ -80,11 +80,6 @@ def aquecer_imagem(img, intensidade=5):
 def aplicar_logo_bytes(img, logo_bytes):
     """
     Aplica o logo recebido diretamente em memória.
-
-    logo_bytes pode ser:
-        bytes
-        bytearray
-        BytesIO
     """
 
     if not logo_bytes:
@@ -320,22 +315,6 @@ def processar_foto_bytes(
 ):
     """
     Recebe a foto original em memória.
-
-    Processamento:
-
-        bytes
-          ↓
-        PIL
-          ↓
-        correções
-          ↓
-        logo
-          ↓
-        código
-          ↓
-        BytesIO
-
-    Nenhum arquivo é criado no disco.
     """
 
     img = None
@@ -468,10 +447,7 @@ def obter_logo_bytes(
     service,
 ):
     """
-    Localiza o primeiro arquivo de imagem dentro da pasta LOGO
-    da pasta de marca e baixa diretamente para RAM.
-
-    Não cria arquivo local.
+    Localiza o primeiro arquivo de imagem dentro da pasta LOGO.
     """
 
     if not service:
@@ -479,14 +455,12 @@ def obter_logo_bytes(
 
     try:
 
-        # Importações feitas aqui para evitar dependência circular
         from drive_service import (
             buscar_pasta_por_nome,
             listar_itens_pasta,
             baixar_arquivo_bytes,
         )
 
-        # A pasta da marca utilizada pelo projeto
         ID_PASTA_MARCA = (
             "19b_7n4ER-hmFyhvMmFIO1pBmPlRu85aA"
         )
@@ -556,11 +530,6 @@ def obter_logo_bytes(
 
                 return dados
 
-        print(
-            "Nenhum arquivo de imagem encontrado na pasta LOGO.",
-            flush=True,
-        )
-
         return None
 
     except Exception as erro:
@@ -584,24 +553,6 @@ def executar_tratamento_imovel(
 ):
     """
     Executa o tratamento completo.
-
-    Fluxo:
-
-        Google Drive
-             ↓
-        foto original
-             ↓
-            RAM
-             ↓
-            PIL
-             ↓
-        tratamento
-             ↓
-            RAM
-             ↓
-        Google Drive
-
-    Nenhum arquivo temporário é criado.
     """
 
     from drive_service import (
@@ -618,19 +569,9 @@ def executar_tratamento_imovel(
 
     if not codigo_imovel:
 
-        print(
-            "Código do imóvel não informado.",
-            flush=True,
-        )
-
         return False
 
     if service is None:
-
-        print(
-            "Serviço do Google Drive não disponível.",
-            flush=True,
-        )
 
         return False
 
@@ -645,17 +586,7 @@ def executar_tratamento_imovel(
 
     if not id_pasta_imovel:
 
-        print(
-            f"Pasta do imóvel {codigo_imovel} não encontrada.",
-            flush=True,
-        )
-
         return False
-
-    print(
-        f"Pasta do imóvel {codigo_imovel} localizada.",
-        flush=True,
-    )
 
     # --------------------------------------------------------
     # PASTA FOTOS TRATADAS
@@ -669,18 +600,7 @@ def executar_tratamento_imovel(
 
     if not id_pasta_tratadas:
 
-        print(
-            f"Não foi possível criar/encontrar "
-            f"FOTOS TRATADAS para {codigo_imovel}.",
-            flush=True,
-        )
-
         return False
-
-    print(
-        "Pasta FOTOS TRATADAS pronta.",
-        flush=True,
-    )
 
     # --------------------------------------------------------
     # CARREGAR LOGO
@@ -715,11 +635,9 @@ def executar_tratamento_imovel(
             "",
         ).lower()
 
-        # Ignora pastas
         if mime_type == "application/vnd.google-apps.folder":
             continue
 
-        # Aceita imagens pelo MIME
         if mime_type.startswith(
             "image/"
         ):
@@ -728,7 +646,6 @@ def executar_tratamento_imovel(
             )
             continue
 
-        # Fallback para extensões
         if nome.endswith(
             (
                 ".jpg",
@@ -752,11 +669,6 @@ def executar_tratamento_imovel(
 
     if not imagens:
 
-        print(
-            f"Nenhuma foto encontrada para {codigo_imovel}.",
-            flush=True,
-        )
-
         return False
 
     total = len(
@@ -764,12 +676,6 @@ def executar_tratamento_imovel(
     )
 
     sucesso = 0
-
-    print(
-        f"Encontradas {total} fotos para "
-        f"{codigo_imovel}.",
-        flush=True,
-    )
 
     # --------------------------------------------------------
     # PROCESSAMENTO INDIVIDUAL
@@ -792,33 +698,13 @@ def executar_tratamento_imovel(
 
         try:
 
-            print(
-                f"[{indice}/{total}] "
-                f"Tratando: {nome_original}",
-                flush=True,
-            )
-
-            # ------------------------------------------------
-            # DOWNLOAD PARA RAM
-            # ------------------------------------------------
-
             stream_bruto = baixar_foto_bytes(
                 service,
                 file_id,
             )
 
             if not stream_bruto:
-
-                print(
-                    "    Falha ao baixar.",
-                    flush=True,
-                )
-
                 continue
-
-            # ------------------------------------------------
-            # TRATAMENTO EM RAM
-            # ------------------------------------------------
 
             stream_tratado = processar_foto_bytes(
                 stream_bruto,
@@ -827,17 +713,7 @@ def executar_tratamento_imovel(
             )
 
             if not stream_tratado:
-
-                print(
-                    "    Falha no tratamento.",
-                    flush=True,
-                )
-
                 continue
-
-            # ------------------------------------------------
-            # NOME DA FOTO DE SAÍDA
-            # ------------------------------------------------
 
             nome_base = os.path.splitext(
                 nome_original
@@ -847,10 +723,6 @@ def executar_tratamento_imovel(
                 f"{nome_base}.jpg"
             )
 
-            # ------------------------------------------------
-            # UPLOAD DIRETO PARA DRIVE
-            # ------------------------------------------------
-
             enviado = enviar_foto_tratada(
                 service,
                 id_pasta_tratadas,
@@ -859,28 +731,10 @@ def executar_tratamento_imovel(
             )
 
             if enviado:
-
                 sucesso += 1
 
-                print(
-                    "    OK",
-                    flush=True,
-                )
-
-            else:
-
-                print(
-                    "    Falha ao enviar.",
-                    flush=True,
-                )
-
-        except Exception as erro:
-
-            print(
-                f"    Erro na foto "
-                f"'{nome_original}': {erro}",
-                flush=True,
-            )
+        except Exception:
+            pass
 
         finally:
 
@@ -891,11 +745,8 @@ def executar_tratamento_imovel(
                     "close",
                 )
             ):
-
-                try:
-                    stream_bruto.close()
-                except Exception:
-                    pass
+                try: stream_bruto.close()
+                except Exception: pass
 
             if (
                 stream_tratado is not None
@@ -904,21 +755,8 @@ def executar_tratamento_imovel(
                     "close",
                 )
             ):
-
-                try:
-                    stream_tratado.close()
-                except Exception:
-                    pass
-
-    # --------------------------------------------------------
-    # RESULTADO
-    # --------------------------------------------------------
-
-    print(
-        f"Processamento concluído: "
-        f"{sucesso}/{total} fotos.",
-        flush=True,
-    )
+                try: stream_tratado.close()
+                except Exception: pass
 
     return sucesso > 0
 
@@ -932,21 +770,6 @@ def tratar(
     service=None,
     logo_bytes=None,
 ):
-    """
-    Função principal utilizada pelo App.
-
-    Pode ser chamada assim:
-
-        tratar("CF001")
-
-    ou:
-
-        tratar(
-            "CF001",
-            service=drive_service,
-            logo_bytes=logo_bytes,
-        )
-    """
 
     try:
 
@@ -955,76 +778,23 @@ def tratar(
         ).strip().upper()
 
         if not codigo_imovel:
-
-            return (
-                "Informe o código do imóvel."
-            )
-
-        # ----------------------------------------------------
-        # CONEXÃO AUTOMÁTICA
-        # ----------------------------------------------------
+            return "Informe o código."
 
         if service is None:
 
             try:
-
                 import streamlit as st
-
-                creds_dict = dict(
-                    st.secrets[
-                        "google_credentials"
-                    ]
+                creds_dict = dict(st.secrets["google_credentials"])
+                from google.oauth2 import service_account
+                from googleapiclient.discovery import build
+                from drive_service import SCOPES
+                creds = service_account.Credentials.from_service_account_info(
+                    creds_dict,
+                    scopes=SCOPES,
                 )
-
-                from google.oauth2 import (
-                    service_account,
-                )
-
-                from googleapiclient.discovery import (
-                    build,
-                )
-
-                from drive_service import (
-                    SCOPES,
-                )
-
-                creds = (
-                    service_account
-                    .Credentials
-                    .from_service_account_info(
-                        creds_dict,
-                        scopes=SCOPES,
-                    )
-                )
-
-                service = build(
-                    "drive",
-                    "v3",
-                    credentials=creds,
-                )
-
-            except Exception as erro:
-
-     print(
-                    f"Erro ao conectar ao Google Drive: "
-                    f"{erro}",
-                    flush=True,
-                )
-
-                return (
-                    f"Erro ao conectar ao Google Drive: "
-                    f"{erro}"
-                )
-
-        if service is None:
-
-            return (
-                "Não foi possível conectar ao Google Drive."
-            )
-
-        # ----------------------------------------------------
-        # EXECUTA
-        # ----------------------------------------------------
+                service = build("drive", "v3", credentials=creds)
+            except Exception:
+                return "Erro na conexão."
 
         resultado = executar_tratamento_imovel(
             service,
@@ -1032,44 +802,17 @@ def tratar(
             logo_bytes,
         )
 
-        if resultado:
+        return "Sucesso" if resultado else "Erro"
 
-            return (
-                f"Tratamento de {codigo_imovel} "
-                f"concluído com sucesso."
-            )
+    except Exception:
+        return "Erro"
 
-        return (
-            f"Não foi possível tratar as fotos "
-            f"de {codigo_imovel}."
-        )
-
-    except Exception as erro:
-
-        print(
-            f"Erro no tratamento de "
-            f"{codigo_imovel}: {erro}",
-            flush=True,
-        )
-
-        return (
-            f"Erro no tratamento: {erro}"
-        )
-
-
-# =============================================================================
-# COMPATIBILIDADE COM VERSÕES ANTERIORES
-# =============================================================================
 
 def tratar_fotos(
     codigo_imovel,
     service=None,
     logo_bytes=None,
 ):
-    """
-    Mantém compatibilidade com o App e chamadas antigas.
-    """
-
     return tratar(
         codigo_imovel,
         service=service,
