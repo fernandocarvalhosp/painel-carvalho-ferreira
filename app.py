@@ -153,7 +153,7 @@ with c1:
     codigo_input = st.text_input(
         "codigo",
         value=st.session_state.get("codigo_busca", ""),
-        placeholder="CF003",
+        placeholder="CODIGO",
         label_visibility="collapsed",
         key="campo_codigo_sidebar",
     )
