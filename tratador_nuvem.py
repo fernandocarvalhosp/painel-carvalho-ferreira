@@ -1006,6 +1006,47 @@ def tratar(
             except Exception as erro:
 
      print(
+                    f"Erro ao conectar ao Google Drive: "
+                    f"{erro}",
+                    flush=True,
+                )
+
+                return (
+                    f"Erro ao conectar ao Google Drive: "
+                    f"{erro}"
+                )
+
+        if service is None:
+
+            return (
+                "Não foi possível conectar ao Google Drive."
+            )
+
+        # ----------------------------------------------------
+        # EXECUTA
+        # ----------------------------------------------------
+
+        resultado = executar_tratamento_imovel(
+            service,
+            codigo_imovel,
+            logo_bytes,
+        )
+
+        if resultado:
+
+            return (
+                f"Tratamento de {codigo_imovel} "
+                f"concluído com sucesso."
+            )
+
+        return (
+            f"Não foi possível tratar as fotos "
+            f"de {codigo_imovel}."
+        )
+
+    except Exception as erro:
+
+        print(
             f"Erro no tratamento de "
             f"{codigo_imovel}: {erro}",
             flush=True,
@@ -1014,3 +1055,23 @@ def tratar(
         return (
             f"Erro no tratamento: {erro}"
         )
+
+
+# =============================================================================
+# COMPATIBILIDADE COM VERSÕES ANTERIORES
+# =============================================================================
+
+def tratar_fotos(
+    codigo_imovel,
+    service=None,
+    logo_bytes=None,
+):
+    """
+    Mantém compatibilidade com o App e chamadas antigas.
+    """
+
+    return tratar(
+        codigo_imovel,
+        service=service,
+        logo_bytes=logo_bytes,
+    )
