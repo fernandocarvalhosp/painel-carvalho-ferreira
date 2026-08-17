@@ -142,12 +142,6 @@ def executar_gerador_posts(codigo_imovel):
     except Exception as e:
         return False, f"Erro ao gerar posts: {e}"
 
-
-
-Fernando Carvalho <nandohenrique360@gmail.com>
-09:06 (há 0 minutos)
-para mim
-
 # -------------------------------------------------
 # SIDEBAR
 # -------------------------------------------------
