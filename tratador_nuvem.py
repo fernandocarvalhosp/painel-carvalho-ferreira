@@ -1014,23 +1014,3 @@ def tratar(
         return (
             f"Erro no tratamento: {erro}"
         )
-
-
-# =============================================================================
-# COMPATIBILIDADE COM VERSÕES ANTERIORES
-# =============================================================================
-
-def tratar_fotos(
-    codigo_imovel,
-    service=None,
-    logo_bytes=None,
-):
-    """
-    Mantém compatibilidade com o App e chamadas antigas.
-    """
-
-    return tratar(
-        codigo_imovel,
-        service=service,
-        logo_bytes=logo_bytes,
-    )
