@@ -760,7 +760,7 @@ def enviar_foto_tratada(
             body=metadata,
             media_body=media,
             fields="id,name",
-            supportsAllDrives=True,
+           # supportsAllDrives=True,
         ).execute()
 
         return bool(
