@@ -1,37 +1,41 @@
 # -*- coding: utf-8 -*-
-import streamlit as st
-import json
 import importlib
+from pathlib import Path
+
+import streamlit as st
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-import gerador_pdf
-import gerar_posts
-import tratador_nuvem
-# Defina os escopos que seu aplicativo usa (ajuste se precisar de mais algum)
-SCOPES = [
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
 
-# Leitura segura das credenciais do Streamlit Secrets
-creds_dict = dict(st.secrets["google_credentials"])
-creds = service_account.Credentials.from_service_account_info(
-    creds_dict, scopes=SCOPES
+import gerador_pdf
+
+try:
+    import gerar_posts
+except Exception:
+    gerar_posts = None
+
+try:
+    import tratador_nuvem
+except Exception:
+    tratador_nuvem = None
+
+st.set_page_config(
+    page_title="Carvalho Ferreira | Painel",
+    layout="wide",
 )
-# -------------------------------------------------
-# CONEXAO GOOGLE SHEETS (ADAPTADA PARA NUVEM)
-# -------------------------------------------------
+
+# App so precisa gravar/ler planilha
+SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+SPREADSHEET_ID = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
+NOME_ABA = "Imoveis"
+
+
 @st.cache_resource
 def conectar_sheets():
-    # Lê diretamente do Streamlit Secrets usando o nome correto que salvamos
     creds_dict = dict(st.secrets["google_credentials"])
     creds = service_account.Credentials.from_service_account_info(
-        creds_dict,
-        scopes=SCOPES
+        creds_dict, scopes=SCOPES
     )
-   
-    service = build("sheets", "v4", credentials=creds)
-    return service
+    return build("sheets", "v4", credentials=creds)
 
 
 def normalizar(texto):
@@ -47,8 +51,8 @@ def buscar_imovel(codigo):
             service.spreadsheets()
             .values()
             .get(
-                spreadsheetId = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w",
-                range=f"Imoveis!A:Z",
+                spreadsheetId=SPREADSHEET_ID,
+                range=f"'{NOME_ABA}'!A:Z",
             )
             .execute()
         )
@@ -65,10 +69,7 @@ def buscar_imovel(codigo):
             while len(row) < len(cabecalho):
                 row.append("")
             if normalizar(row[0]) == codigo_busca:
-                dados = {}
-                for i, chave in enumerate(cabecalho):
-                    dados[chave] = row[i] if i < len(row) else ""
-                return dados
+                return {cabecalho[i]: row[i] for i in range(len(cabecalho))}
         return None
     except Exception as e:
         st.error(f"Erro ao conectar na planilha: {e}")
@@ -76,17 +77,14 @@ def buscar_imovel(codigo):
 
 
 def salvar_dados(codigo, novos_dados):
-    """
-    novos_dados: lista na ordem das colunas A:Z
-    """
     try:
         service = conectar_sheets()
         result = (
             service.spreadsheets()
             .values()
             .get(
-                spreadsheetId="1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w",
-                range=f"Imoveis!A:Z",
+                spreadsheetId=SPREADSHEET_ID,
+                range=f"'{NOME_ABA}'!A:Z",
             )
             .execute()
         )
@@ -94,10 +92,10 @@ def salvar_dados(codigo, novos_dados):
 
         for i, row in enumerate(rows):
             if row and normalizar(row[0]) == normalizar(codigo):
-                range_to_update = f"Imoveis!A{i + 1}:Z{i + 1}"
+                range_to_update = f"'{NOME_ABA}'!A{i + 1}:Z{i + 1}"
                 body = {"values": [novos_dados]}
                 service.spreadsheets().values().update(
-                    spreadsheetId="1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w",
+                    spreadsheetId=SPREADSHEET_ID,
                     range=range_to_update,
                     valueInputOption="RAW",
                     body=body,
@@ -116,199 +114,305 @@ def obter_valor(dados_imovel, chave):
 
 
 def executar_gerador_pdf(codigo_imovel):
+    """Retorna (ok, pdf_bytes_ou_mensagem)."""
     try:
         importlib.reload(gerador_pdf)
-        caminho = gerador_pdf.gerar_pdf(codigo_imovel)
-        if caminho and Path(caminho).exists():
-            return True, caminho
+        pdf_bytes = gerador_pdf.gerar_pdf(codigo_imovel)
+        if pdf_bytes and isinstance(pdf_bytes, (bytes, bytearray)) and len(pdf_bytes) > 10000:
+            return True, pdf_bytes
         return False, "Falha ao gerar o PDF."
     except Exception as e:
         return False, f"Erro ao gerar PDF: {e}"
 
+
 def executar_gerador_posts(codigo_imovel):
+    """Retorna (ok, caminho_ou_bytes_ou_mensagem)."""
+    if gerar_posts is None:
+        return False, "Modulo gerar_posts nao encontrado."
     try:
         importlib.reload(gerar_posts)
-        caminho = gerar_posts.gerar_posts(codigo_imovel)
-        if caminho and Path(caminho).exists():
-            return True, caminho
+        resultado = gerar_posts.gerar_posts(codigo_imovel)
+
+        # bytes (versao nova) ou caminho (versao antiga)
+        if isinstance(resultado, (bytes, bytearray)) and len(resultado) > 1000:
+            return True, resultado
+        if isinstance(resultado, str) and Path(resultado).exists():
+            return True, resultado
         return False, "Falha ao gerar os posts."
     except Exception as e:
         return False, f"Erro ao gerar posts: {e}"
 
 
 # -------------------------------------------------
-# INTERFACE
+# SIDEBAR
+# -------------------------------------------------
+st.sidebar.markdown("### Selecao de Imovel")
+
+c1, c2 = st.sidebar.columns([3, 1])
+with c1:
+    codigo_input = st.text_input(
+        "codigo",
+        value=st.session_state.get("codigo_busca", ""),
+        placeholder="CF003",
+        label_visibility="collapsed",
+        key="campo_codigo_sidebar",
+    )
+with c2:
+    buscar = st.button("Buscar", use_container_width=True, key="btn_buscar")
+
+codigo_digitado = (codigo_input or "").strip().upper()
+if buscar or codigo_digitado:
+    if codigo_digitado:
+        st.session_state["codigo_busca"] = codigo_digitado
+
+codigo_busca = st.session_state.get("codigo_busca", "").strip().upper()
+if codigo_busca:
+    st.sidebar.caption(codigo_busca)
+
+st.sidebar.markdown("### Materiais")
+
+# PDF
+if st.sidebar.button("Gerar PDF", use_container_width=True, type="primary", key="btn_pdf"):
+    if not codigo_busca:
+        st.sidebar.error("Informe o codigo.")
+    else:
+        with st.spinner("Gerando PDF..."):
+            ok, res = executar_gerador_pdf(codigo_busca)
+        if ok:
+            st.session_state["pdf_bytes"] = res
+            st.session_state["pdf_nome"] = f"{codigo_busca}.pdf"
+            st.sidebar.success("PDF gerado.")
+        else:
+            st.sidebar.error(res)
+
+if st.session_state.get("pdf_bytes"):
+    st.sidebar.download_button(
+        "Baixar PDF",
+        data=st.session_state["pdf_bytes"],
+        file_name=st.session_state.get("pdf_nome", "dossie.pdf"),
+        mime="application/pdf",
+        use_container_width=True,
+        key="dl_pdf_sidebar",
+    )
+
+# Posts
+if st.sidebar.button("Gerar Posts", use_container_width=True, key="btn_posts"):
+    if not codigo_busca:
+        st.sidebar.error("Informe o codigo.")
+    else:
+        with st.spinner("Gerando posts..."):
+            ok, res = executar_gerador_posts(codigo_busca)
+        if ok:
+            st.session_state["posts_resultado"] = res
+            st.sidebar.success("Posts gerados.")
+        else:
+            st.sidebar.error(res)
+
+if st.session_state.get("posts_resultado") is not None:
+    posts_res = st.session_state["posts_resultado"]
+    if isinstance(posts_res, (bytes, bytearray)):
+        st.sidebar.download_button(
+            "Baixar Posts (ZIP)",
+            data=posts_res,
+            file_name=f"posts_{codigo_busca}.zip",
+            mime="application/zip",
+            use_container_width=True,
+            key="dl_posts_bytes",
+        )
+    else:
+        caminho = Path(str(posts_res))
+        if caminho.exists():
+            with open(caminho, "rb") as f:
+                st.sidebar.download_button(
+                    "Baixar Posts (ZIP)",
+                    data=f.read(),
+                    file_name=caminho.name,
+                    mime="application/zip",
+                    use_container_width=True,
+                    key="dl_posts_path",
+                )
+
+# Tratar fotos (opcional)
+if st.sidebar.button("Tratar fotos", use_container_width=True, key="btn_tratar"):
+    if not codigo_busca:
+        st.sidebar.error("Informe o codigo.")
+    else:
+        st.session_state["confirmar_tratamento"] = True
+
+if st.session_state.get("confirmar_tratamento"):
+    st.sidebar.warning("O tratamento pode demorar alguns minutos.")
+    a1, a2 = st.sidebar.columns(2)
+    with a1:
+        if st.button("Sim", use_container_width=True, key="trat_sim"):
+            st.session_state["confirmar_tratamento"] = False
+            if tratador_nuvem is None:
+                st.sidebar.error("Modulo tratador_nuvem nao encontrado.")
+            else:
+                try:
+                    importlib.reload(tratador_nuvem)
+                    if hasattr(tratador_nuvem, "tratar"):
+                        msg = tratador_nuvem.tratar(codigo_busca)
+                    elif hasattr(tratador_nuvem, "tratar_fotos"):
+                        msg = tratador_nuvem.tratar_fotos(codigo_busca)
+                    else:
+                        msg = "Funcao de tratamento nao encontrada."
+                    st.sidebar.success(str(msg) if msg else "Concluido.")
+                except Exception as e:
+                    st.sidebar.error(str(e))
+    with a2:
+        if st.button("Nao", use_container_width=True, key="trat_nao"):
+            st.session_state["confirmar_tratamento"] = False
+
+
+# -------------------------------------------------
+# AREA PRINCIPAL
 # -------------------------------------------------
 st.title("Carvalho Ferreira")
-st.subheader("Painel de Gestao e Geracao de Materiais")
-st.markdown("---")
-
-st.sidebar.header("Selecao de Imovel")
-codigo_busca = st.sidebar.text_input(
-    "Codigo do Imovel (Ex: CF003)"
-).strip().upper()
+st.caption("Painel de gestao e geracao de materiais")
 
 dados_imovel = None
-
 if codigo_busca:
-    with st.spinner("Buscando dados na planilha..."):
+    with st.spinner("Carregando dados..."):
         dados_imovel = buscar_imovel(codigo_busca)
+    if dados_imovel is None:
+        st.warning(f"Registro {codigo_busca} nao localizado.")
 
-    if dados_imovel:
-        st.sidebar.success(f"Cadastro {codigo_busca} carregado.")
-    else:
-        st.sidebar.warning(f"Registro {codigo_busca} nao localizado.")
-
-
-tab1, tab2, tab3, tab4 = st.tabs(
-    [
-        "Identificacao e Controle",
-        "Dados Tecnicos",
-        "Divulgacao",
-        "Geracao de PDF",
-    ]
-)
+tab1, tab2, tab3 = st.tabs(["Identificacao", "Dados Tecnicos", "Divulgacao"])
 
 with tab1:
     col_a, col_b = st.columns(2)
     with col_a:
-        novo_codigo = st.text_input("Codigo", value=obter_valor(dados_imovel, "CODIGO"))
-        novo_tipo = st.text_input("Tipo", value=obter_valor(dados_imovel, "TIPO"))
-        novo_cidade = st.text_input("Cidade", value=obter_valor(dados_imovel, "CIDADE"))
-        novo_bairro = st.text_input("Bairro", value=obter_valor(dados_imovel, "BAIRRO"))
-        novo_endereco = st.text_input("Endereco", value=obter_valor(dados_imovel, "ENDERECO"))
+        novo_codigo = st.text_input(
+            "Codigo", value=obter_valor(dados_imovel, "CODIGO"), key="f_codigo"
+        )
+        novo_tipo = st.text_input(
+            "Tipo", value=obter_valor(dados_imovel, "TIPO"), key="f_tipo"
+        )
+        novo_cidade = st.text_input(
+            "Cidade", value=obter_valor(dados_imovel, "CIDADE"), key="f_cidade"
+        )
+        novo_bairro = st.text_input(
+            "Bairro", value=obter_valor(dados_imovel, "BAIRRO"), key="f_bairro"
+        )
+        novo_endereco = st.text_input(
+            "Endereco", value=obter_valor(dados_imovel, "ENDERECO"), key="f_endereco"
+        )
     with col_b:
         novo_proprietario = st.text_input(
-            "Proprietario", value=obter_valor(dados_imovel, "PROPRIETARIO")
+            "Proprietario",
+            value=obter_valor(dados_imovel, "PROPRIETARIO"),
+            key="f_proprietario",
         )
-        novo_contato = st.text_input("Contato", value=obter_valor(dados_imovel, "CONTATO"))
-        novo_status = st.text_input("Status", value=obter_valor(dados_imovel, "STATUS"))
-        novo_exclus = st.text_input("Exclusividade", value=obter_valor(dados_imovel, "EXCLUS"))
-        novo_data = st.text_input("Data", value=obter_valor(dados_imovel, "DATA"))
+        novo_contato = st.text_input(
+            "Contato", value=obter_valor(dados_imovel, "CONTATO"), key="f_contato"
+        )
+        novo_status = st.text_input(
+            "Status", value=obter_valor(dados_imovel, "STATUS"), key="f_status"
+        )
+        novo_exclus = st.text_input(
+            "Exclusividade", value=obter_valor(dados_imovel, "EXCLUS"), key="f_exclus"
+        )
+        novo_data = st.text_input(
+            "Data", value=obter_valor(dados_imovel, "DATA"), key="f_data"
+        )
 
 with tab2:
     col_d, col_e = st.columns(2)
     with col_d:
-        novo_valor = st.text_input("Valor", value=obter_valor(dados_imovel, "VALOR"))
+        novo_valor = st.text_input(
+            "Valor", value=obter_valor(dados_imovel, "VALOR"), key="f_valor"
+        )
         novo_area_util = st.text_input(
-            "Area Util", value=obter_valor(dados_imovel, "AREA UTIL")
+            "Area Util", value=obter_valor(dados_imovel, "AREA UTIL"), key="f_area_util"
         )
         novo_area_total = st.text_input(
-            "Area Total", value=obter_valor(dados_imovel, "AREA TOTAL")
+            "Area Total",
+            value=obter_valor(dados_imovel, "AREA TOTAL"),
+            key="f_area_total",
         )
-        novo_andar = st.text_input("Andar", value=obter_valor(dados_imovel, "ANDAR"))
-        novo_iptu = st.text_input("IPTU", value=obter_valor(dados_imovel, "IPTU"))
+        novo_andar = st.text_input(
+            "Andar", value=obter_valor(dados_imovel, "ANDAR"), key="f_andar"
+        )
+        novo_iptu = st.text_input(
+            "IPTU", value=obter_valor(dados_imovel, "IPTU"), key="f_iptu"
+        )
     with col_e:
         novo_dormitorios = st.text_input(
-            "Dormitorios", value=obter_valor(dados_imovel, "DORMITORIOS")
+            "Dormitorios",
+            value=obter_valor(dados_imovel, "DORMITORIOS"),
+            key="f_dormitorios",
         )
         novo_banheiros = st.text_input(
-            "Banheiros", value=obter_valor(dados_imovel, "BANHEIROS")
+            "Banheiros", value=obter_valor(dados_imovel, "BANHEIROS"), key="f_banheiros"
         )
-        novo_suites = st.text_input("Suites", value=obter_valor(dados_imovel, "SUITES"))
-        novo_vagas = st.text_input("Vagas", value=obter_valor(dados_imovel, "VAGAS"))
+        novo_suites = st.text_input(
+            "Suites", value=obter_valor(dados_imovel, "SUITES"), key="f_suites"
+        )
+        novo_vagas = st.text_input(
+            "Vagas", value=obter_valor(dados_imovel, "VAGAS"), key="f_vagas"
+        )
 
 with tab3:
-    novo_titulo_1 = st.text_input("Titulo 1", value=obter_valor(dados_imovel, "TITULO 1"))
-    novo_titulo_2 = st.text_input("Titulo 2", value=obter_valor(dados_imovel, "TITULO 2"))
-    novo_titulo_3 = st.text_input("Titulo 3", value=obter_valor(dados_imovel, "TITULO 3"))
+    novo_titulo_1 = st.text_input(
+        "Titulo 1", value=obter_valor(dados_imovel, "TITULO 1"), key="f_titulo1"
+    )
+    novo_titulo_2 = st.text_input(
+        "Titulo 2", value=obter_valor(dados_imovel, "TITULO 2"), key="f_titulo2"
+    )
+    novo_titulo_3 = st.text_input(
+        "Titulo 3", value=obter_valor(dados_imovel, "TITULO 3"), key="f_titulo3"
+    )
     novo_descricao = st.text_area(
-        "Descricao", value=obter_valor(dados_imovel, "DESCRICAO"), height=150
+        "Descricao",
+        value=obter_valor(dados_imovel, "DESCRICAO"),
+        height=150,
+        key="f_descricao",
     )
     novo_obs_extras = st.text_area(
-        "Obs Extras", value=obter_valor(dados_imovel, "OBS EXTRAS"), height=100
+        "Obs Extras",
+        value=obter_valor(dados_imovel, "OBS EXTRAS"),
+        height=100,
+        key="f_obs",
     )
 
-# Campos preservados da planilha
 novo_link = obter_valor(dados_imovel, "LINK")
 novo_foto = obter_valor(dados_imovel, "FOTO")
 
-with tab4:
-    st.markdown("### Geracao do Dossie PDF")
-    st.write(
-        "O sistema le os dados do Google Sheets e as fotos de "
-        "FOTOS SELECIONADAS no Drive, gera o PDF "
-        "e libera o download."
-    )
-
-    if st.button("Gerar Dossie PDF", type="primary", use_container_width=True):
-        if not codigo_busca:
-            st.warning("Informe o codigo do imovel na barra lateral.")
-        else:
-            with st.spinner("Gerando PDF..."):
-                ok, resultado = executar_gerador_pdf(codigo_busca)
-
-            if ok:
-                st.success("PDF gerado com sucesso.")
-                with open(resultado, "rb") as f:
-                    st.download_button(
-                        label="Baixar PDF",
-                        data=f.read(),
-                        file_name=Path(resultado).name,
-                        mime="application/pdf",
-                        use_container_width=True,
-                    )
-                st.caption(f"Arquivo gerado: {resultado}")
-            else:
-                st.error(resultado)
-
-    if st.button("Gerar Posts", use_container_width=True):
-        if not codigo_busca:
-            st.warning("Informe o codigo do imovel.")
-        else:
-            with st.spinner("Gerando posts..."):
-                ok, resultado = executar_gerador_posts(codigo_busca)
-              
-            if ok:
-                st.success("Posts gerados com sucesso.")
-                with open(resultado, "rb") as f:
-                    st.download_button(
-                        label="Baixar Posts (ZIP)",
-                        data=f.read(),
-                        file_name=Path(resultado).name,
-                        mime="application/zip",
-                        use_container_width=True,
-                    )
-            else:
-                st.error(resultado)
-
 st.markdown("---")
-
-if st.button("Salvar Atualizacoes no Banco de Dados", type="primary", use_container_width=True):
+if st.button("Salvar atualizacoes", type="primary", use_container_width=True, key="btn_salvar"):
     if not codigo_busca:
-        st.warning("Busque um imovel primeiro antes de tentar salvar.")
+        st.warning("Busque um imovel primeiro.")
     else:
         dados_para_salvar = [
-            novo_codigo,        # A CODIGO
-            novo_tipo,          # B TIPO
-            novo_cidade,        # C CIDADE
-            novo_bairro,        # D BAIRRO
-            novo_endereco,      # E ENDERECO
-            novo_proprietario,  # F PROPRIETARIO
-            novo_contato,       # G CONTATO
-            novo_valor,         # H VALOR
-            novo_status,        # I STATUS
-            novo_exclus,        # J EXCLUS
-            novo_data,          # K DATA
-            novo_link,          # L LINK
-            novo_foto,          # M FOTO
-            novo_dormitorios,   # N DORMITORIOS
-            novo_banheiros,     # O BANHEIROS
-            novo_suites,        # P SUITES
-            novo_vagas,         # Q VAGAS
-            novo_area_util,     # R AREA UTIL
-            novo_area_total,    # S AREA TOTAL
-            novo_andar,         # T ANDAR
-            novo_iptu,          # U IPTU
-            novo_titulo_1,      # V TITULO 1
-            novo_titulo_2,      # W TITULO 2
-            novo_titulo_3,      # X TITULO 3
-            novo_descricao,     # Y DESCRICAO
-            novo_obs_extras,    # Z OBS EXTRAS
+            novo_codigo,
+            novo_tipo,
+            novo_cidade,
+            novo_bairro,
+            novo_endereco,
+            novo_proprietario,
+            novo_contato,
+            novo_valor,
+            novo_status,
+            novo_exclus,
+            novo_data,
+            novo_link,
+            novo_foto,
+            novo_dormitorios,
+            novo_banheiros,
+            novo_suites,
+            novo_vagas,
+            novo_area_util,
+            novo_area_total,
+            novo_andar,
+            novo_iptu,
+            novo_titulo_1,
+            novo_titulo_2,
+            novo_titulo_3,
+            novo_descricao,
+            novo_obs_extras,
         ]
-
-        with st.spinner("Salvando alteracoes na planilha..."):
+        with st.spinner("Salvando..."):
             if salvar_dados(codigo_busca, dados_para_salvar):
-                st.success("Dados atualizados com sucesso na planilha.")
+                st.success("Dados atualizados.")
             else:
-                st.error("Nao foi possivel encontrar a linha correspondente para atualizar.")
+                st.error("Nao foi possivel salvar.")
