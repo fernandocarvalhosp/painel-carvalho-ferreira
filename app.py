@@ -143,16 +143,25 @@ def executar_gerador_posts(codigo_imovel):
         return False, f"Erro ao gerar posts: {e}"
 
 
+
+Fernando Carvalho <nandohenrique360@gmail.com>
+09:06 (há 0 minutos)
+para mim
+
 # -------------------------------------------------
 # SIDEBAR
 # -------------------------------------------------
 st.sidebar.markdown("### Selecao de Imovel")
 
+# Garante que a chave exista
+if "codigo_busca" not in st.session_state:
+    st.session_state["codigo_busca"] = ""
+
 c1, c2 = st.sidebar.columns([3, 1])
 with c1:
     codigo_input = st.text_input(
         "codigo",
-        value=st.session_state.get("codigo_busca", ""),
+        value=st.session_state["codigo_busca"],
         placeholder="CODIGO",
         label_visibility="collapsed",
         key="campo_codigo_sidebar",
@@ -160,12 +169,19 @@ with c1:
 with c2:
     buscar = st.button("Buscar", use_container_width=True, key="btn_buscar")
 
+# Atualiza o session_state de forma confiável
 codigo_digitado = (codigo_input or "").strip().upper()
-if buscar or codigo_digitado:
-    if codigo_digitado:
-        st.session_state["codigo_busca"] = codigo_digitado
+
+if buscar and codigo_digitado:
+    st.session_state["codigo_busca"] = codigo_digitado
+    st.rerun()          # força um rerun limpo com o valor já gravado
+
+# Também atualiza se o usuário apertar Enter (sem clicar no botão)
+elif codigo_digitado and codigo_digitado != st.session_state["codigo_busca"]:
+    st.session_state["codigo_busca"] = codigo_digitado
 
 codigo_busca = st.session_state.get("codigo_busca", "").strip().upper()
+
 if codigo_busca:
     st.sidebar.caption(codigo_busca)
 
