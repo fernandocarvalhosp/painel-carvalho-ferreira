@@ -1,3 +1,31 @@
+import streamlit as st
+
+def verificar_senha():
+    # Verifica se a senha já foi digitada corretamente nesta sessão
+    if "senha_correta" not in st.session_state:
+        st.session_state["senha_correta"] = False
+
+    if st.session_state["senha_correta"]:
+        return True
+
+    # Tela de Login simples na interface
+    st.subheader("🔒 Acesso Restrito - Painel Carvalho Ferreira")
+    senha_digitada = st.text_input("Digite a senha de acesso:", type="password")
+    
+    if st.button("Entrar"):
+        # Compara com a senha salva nos segredos da nuvem (ou uma fixa)
+        if senha_digitada == st.secrets["passwords"]["senha_acesso"]:
+            st.session_state["senha_correta"] = True
+            st.rerun()
+        else:
+            st.error("Senha incorreta. Tente novamente.")
+            
+    return False
+
+# Trava principal: Se não autenticar, o código para aqui
+if not verificar_senha():
+    st.stop()
+
 # -*- coding: utf-8 -*-
 import importlib
 from pathlib import Path
