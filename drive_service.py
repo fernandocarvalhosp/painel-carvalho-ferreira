@@ -294,3 +294,86 @@ def baixar_imagens_pasta(service, id_pasta):
 
     return imagens
 
+# =============================================================================
+# FUNÇÕES ESPECÍFICAS DE SUPORTE AO TRATADOR DE IMÓVEIS
+# =============================================================================
+
+def encontrar_pasta_imovel(service, codigo_imovel):
+    """
+    Busca a pasta principal do imóvel pelo código na raiz ou estrutura do Drive.
+    """
+    codigo_imovel = str(codigo_imovel).strip().upper()
+    pastas = buscar_itens(
+        service,
+        nome=codigo_imovel,
+        mime_type="application/vnd.google-apps.folder",
+    )
+    return pastas[0]["id"] if pastas else None
+
+
+def criar_pasta_se_nao_existir(service, nome_pasta, id_pasta_pai):
+    """
+    Verifica se uma subpasta existe dentro da pasta pai. Se não existir, cria.
+    Retorna o ID da pasta.
+    """
+    id_existente = buscar_pasta_por_nome(service, nome_pasta, id_pasta_pai)
+    if id_existente:
+        return id_existente
+
+    try:
+        metadata = {
+            "name": nome_pasta,
+            "mimeType": "application/vnd.google-apps.folder",
+            "parents": [id_pasta_pai],
+        }
+        pasta = service.files().create(
+            body=metadata,
+            fields="id",
+            supportsAllDrives=True,
+        ).execute()
+        return pasta.get("id")
+    except Exception as e:
+        print(f"Erro ao criar pasta '{nome_pasta}': {e}", flush=True)
+        return None
+
+
+def baixar_foto_bytes(service, file_id):
+    """
+    Atalho compatível para baixar os bytes de uma foto bruta.
+    """
+    return baixar_arquivo_bytes(service, file_id)
+
+
+def enviar_foto_tratada(service, id_pasta_destino, nome_arquivo, stream_tratado):
+    """
+    Faz o upload da foto tratada (em BytesIO) diretamente para a nuvem.
+    """
+    from googleapiclient.http import MediaIoBaseUpload
+
+    try:
+        if isinstance(stream_tratado, io.BytesIO):
+            stream_tratado.seek(0)
+
+        metadata = {
+            "name": nome_arquivo,
+            "parents": [id_pasta_destino],
+        }
+
+        media = MediaIoBaseUpload(
+            stream_tratado,
+            mimetype="image/jpeg",
+            resumable=True,
+        )
+
+        arquivo = service.files().create(
+            body=metadata,
+            media_body=media,
+            fields="id",
+            supportsAllDrives=True,
+        ).execute()
+
+        return arquivo.get("id") is not None
+
+    except Exception as e:
+        print(f"Erro ao enviar foto tratada '{nome_arquivo}': {e}", flush=True)
+        return False
