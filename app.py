@@ -133,7 +133,6 @@ def executar_gerador_posts(codigo_imovel):
         importlib.reload(gerar_posts)
         resultado = gerar_posts.gerar_posts(codigo_imovel)
 
-        # bytes (versao nova) ou caminho (versao antiga)
         if isinstance(resultado, (bytes, bytearray)) and len(resultado) > 1000:
             return True, resultado
         if isinstance(resultado, str) and Path(resultado).exists():
@@ -143,13 +142,18 @@ def executar_gerador_posts(codigo_imovel):
         return False, f"Erro ao gerar posts: {e}"
 
 # -------------------------------------------------
+# INICIALIZAÇÃO DE ESTADO
+# -------------------------------------------------
+if "codigo_busca" not in st.session_state:
+    st.session_state["codigo_busca"] = ""
+
+if "dados_imovel" not in st.session_state:
+    st.session_state["dados_imovel"] = None
+
+# -------------------------------------------------
 # SIDEBAR
 # -------------------------------------------------
 st.sidebar.markdown("### Selecao de Imovel")
-
-# Garante que a chave exista
-if "codigo_busca" not in st.session_state:
-    st.session_state["codigo_busca"] = ""
 
 c1, c2 = st.sidebar.columns([3, 1])
 with c1:
@@ -163,18 +167,20 @@ with c1:
 with c2:
     buscar = st.button("Buscar", use_container_width=True, key="btn_buscar")
 
-# Atualiza o session_state de forma confiável
 codigo_digitado = (codigo_input or "").strip().upper()
 
-if buscar and codigo_digitado:
+# Dispara a busca quando clica no botão ou altera o código e aperta Enter
+if (buscar and codigo_digitado) or (codigo_digitado and codigo_digitado != st.session_state["codigo_busca"]):
     st.session_state["codigo_busca"] = codigo_digitado
-    st.rerun()          # força um rerun limpo com o valor já gravado
-
-# Também atualiza se o usuário apertar Enter (sem clicar no botão)
-elif codigo_digitado and codigo_digitado != st.session_state["codigo_busca"]:
-    st.session_state["codigo_busca"] = codigo_digitado
+    if codigo_digitado:
+        with st.spinner("Buscando dados na planilha..."):
+            st.session_state["dados_imovel"] = buscar_imovel(codigo_digitado)
+        if st.session_state["dados_imovel"] is None:
+            st.sidebar.warning(f"Registro {codigo_digitado} nao localizado.")
+    st.rerun()
 
 codigo_busca = st.session_state.get("codigo_busca", "").strip().upper()
+dados_imovel = st.session_state.get("dados_imovel", None)
 
 if codigo_busca:
     st.sidebar.caption(codigo_busca)
@@ -279,13 +285,6 @@ if st.session_state.get("confirmar_tratamento"):
 # -------------------------------------------------
 st.title("Carvalho Ferreira")
 st.caption("Painel de gestao e geracao de materiais")
-
-dados_imovel = None
-if codigo_busca:
-    with st.spinner("Carregando dados..."):
-        dados_imovel = buscar_imovel(codigo_busca)
-    if dados_imovel is None:
-        st.warning(f"Registro {codigo_busca} nao localizado.")
 
 tab1, tab2, tab3 = st.tabs(["Identificacao", "Dados Tecnicos", "Divulgacao"])
 
