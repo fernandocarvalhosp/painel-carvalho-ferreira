@@ -141,6 +141,38 @@ def obter_valor(dados_imovel, chave):
     return str(dados_imovel.get(normalizar(chave), ""))
 
 
+def carregar_dados_na_interface(dados):
+    campos = {
+        "f_codigo": "CODIGO",
+        "f_tipo": "TIPO",
+        "f_cidade": "CIDADE",
+        "f_bairro": "BAIRRO",
+        "f_endereco": "ENDERECO",
+        "f_proprietario": "PROPRIETARIO",
+        "f_contato": "CONTATO",
+        "f_status": "STATUS",
+        "f_exclus": "EXCLUS",
+        "f_data": "DATA",
+        "f_valor": "VALOR",
+        "f_area_util": "AREA UTIL",
+        "f_area_total": "AREA TOTAL",
+        "f_andar": "ANDAR",
+        "f_iptu": "IPTU",
+        "f_dormitorios": "DORMITORIOS",
+        "f_banheiros": "BANHEIROS",
+        "f_suites": "SUITES",
+        "f_vagas": "VAGAS",
+        "f_titulo1": "TITULO 1",
+        "f_titulo2": "TITULO 2",
+        "f_titulo3": "TITULO 3",
+        "f_descricao": "DESCRICAO",
+        "f_obs": "OBS EXTRAS",
+    }
+
+    for campo, chave in campos.items():
+        st.session_state[campo] = obter_valor(dados, chave)
+
+
 def executar_gerador_pdf(codigo_imovel):
     """Retorna (ok, pdf_bytes_ou_mensagem)."""
     try:
@@ -168,6 +200,7 @@ def executar_gerador_posts(codigo_imovel):
         return False, "Falha ao gerar os posts."
     except Exception as e:
         return False, f"Erro ao gerar posts: {e}"
+
 
 # -------------------------------------------------
 # INICIALIZAÇÃO DE ESTADO
@@ -201,13 +234,23 @@ with col_busca2:
 codigo_digitado = (codigo_input or "").strip().upper()
 
 # Dispara a busca quando clica no botão ou altera o código e aperta Enter
-if (buscar and codigo_digitado) or (codigo_digitado and codigo_digitado != st.session_state["codigo_busca"]):
+if (buscar and codigo_digitado) or (
+    codigo_digitado
+    and codigo_digitado != st.session_state["codigo_busca"]
+):
     st.session_state["codigo_busca"] = codigo_digitado
+
     if codigo_digitado:
         with st.spinner("Buscando dados na planilha..."):
-            st.session_state["dados_imovel"] = buscar_imovel(codigo_digitado)
-        if st.session_state["dados_imovel"] is None:
+            dados_encontrados = buscar_imovel(codigo_digitado)
+
+        if dados_encontrados is None:
+            st.session_state["dados_imovel"] = None
             st.warning(f"Registro {codigo_digitado} nao localizado.")
+        else:
+            st.session_state["dados_imovel"] = dados_encontrados
+            carregar_dados_na_interface(dados_encontrados)
+
     st.rerun()
 
 codigo_busca = st.session_state.get("codigo_busca", "").strip().upper()
@@ -322,94 +365,87 @@ with tab1:
     col_a, col_b = st.columns(2)
     with col_a:
         novo_codigo = st.text_input(
-            "Codigo", value=obter_valor(dados_imovel, "CODIGO"), key="f_codigo"
+            "Codigo", key="f_codigo"
         )
         novo_tipo = st.text_input(
-            "Tipo", value=obter_valor(dados_imovel, "TIPO"), key="f_tipo"
+            "Tipo", key="f_tipo"
         )
         novo_cidade = st.text_input(
-            "Cidade", value=obter_valor(dados_imovel, "CIDADE"), key="f_cidade"
+            "Cidade", key="f_cidade"
         )
         novo_bairro = st.text_input(
-            "Bairro", value=obter_valor(dados_imovel, "BAIRRO"), key="f_bairro"
+            "Bairro", key="f_bairro"
         )
         novo_endereco = st.text_input(
-            "Endereco", value=obter_valor(dados_imovel, "ENDERECO"), key="f_endereco"
+            "Endereco", key="f_endereco"
         )
     with col_b:
         novo_proprietario = st.text_input(
             "Proprietario",
-            value=obter_valor(dados_imovel, "PROPRIETARIO"),
             key="f_proprietario",
         )
         novo_contato = st.text_input(
-            "Contato", value=obter_valor(dados_imovel, "CONTATO"), key="f_contato"
+            "Contato", key="f_contato"
         )
         novo_status = st.text_input(
-            "Status", value=obter_valor(dados_imovel, "STATUS"), key="f_status"
+            "Status", key="f_status"
         )
         novo_exclus = st.text_input(
-            "Exclusividade", value=obter_valor(dados_imovel, "EXCLUS"), key="f_exclus"
+            "Exclusividade", key="f_exclus"
         )
         novo_data = st.text_input(
-            "Data", value=obter_valor(dados_imovel, "DATA"), key="f_data"
+            "Data", key="f_data"
         )
 
 with tab2:
     col_d, col_e = st.columns(2)
     with col_d:
         novo_valor = st.text_input(
-            "Valor", value=obter_valor(dados_imovel, "VALOR"), key="f_valor"
+            "Valor", key="f_valor"
         )
         novo_area_util = st.text_input(
-            "Area Util", value=obter_valor(dados_imovel, "AREA UTIL"), key="f_area_util"
+            "Area Util", key="f_area_util"
         )
         novo_area_total = st.text_input(
-            "Area Total",
-            value=obter_valor(dados_imovel, "AREA TOTAL"),
-            key="f_area_total",
+            "Area Total", key="f_area_total"
         )
         novo_andar = st.text_input(
-            "Andar", value=obter_valor(dados_imovel, "ANDAR"), key="f_andar"
+            "Andar", key="f_andar"
         )
         novo_iptu = st.text_input(
-            "IPTU", value=obter_valor(dados_imovel, "IPTU"), key="f_iptu"
+            "IPTU", key="f_iptu"
         )
     with col_e:
         novo_dormitorios = st.text_input(
-            "Dormitorios",
-            value=obter_valor(dados_imovel, "DORMITORIOS"),
-            key="f_dormitorios",
+            "Dormitorios", key="f_dormitorios"
         )
         novo_banheiros = st.text_input(
-            "Banheiros", value=obter_valor(dados_imovel, "BANHEIROS"), key="f_banheiros"
+            "Banheiros", key="f_banheiros"
         )
         novo_suites = st.text_input(
-            "Suites", value=obter_valor(dados_imovel, "SUITES"), key="f_suites"
+            "Suites", key="f_suites"
         )
         novo_vagas = st.text_input(
-            "Vagas", value=obter_valor(dados_imovel, "VAGAS"), key="f_vagas"
+            "Vagas", key="f_vagas"
         )
 
 with tab3:
     novo_titulo_1 = st.text_input(
-        "Titulo 1", value=obter_valor(dados_imovel, "TITULO 1"), key="f_titulo1"
+        "Titulo 1", key="f_titulo1"
     )
     novo_titulo_2 = st.text_input(
-        "Titulo 2", value=obter_valor(dados_imovel, "TITULO 2"), key="f_titulo2"
+        "Titulo 2", key="f_titulo2"
     )
     novo_titulo_3 = st.text_input(
-        "Titulo 3", value=obter_valor(dados_imovel, "TITULO 3"), key="f_titulo3"
+        "Titulo 3", key="f_titulo3"
     )
     novo_descricao = st.text_area(
         "Descricao",
-        value=obter_valor(dados_imovel, "DESCRICAO"),
         height=150,
         key="f_descricao",
     )
     novo_obs_extras = st.text_area(
         "Obs Extras",
-        value=obter_valor(dados_imovel, "OBS EXTRAS"),
         height=100,
         key="f_obs",
     )
