@@ -1,13 +1,17 @@
 # -*- coding: utf-8 -*-
+"""
+gerador_pdf.py
+Gera o dossie em memoria (bytes). Sem upload no Drive. Sem interface.
+"""
+import base64
 import io
 import re
-import pathlib import path
+from pathlib import Path
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from jinja2 import Template
-import streamlit as st
 import weasyprint
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -21,16 +25,17 @@ ID_RAIZ = "1NaZ7kv_jHVCTlLV8vqxCzBwbTX5y3fR7"
 SPREADSHEET_ID = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
 NOME_ABA = "Imoveis"
 
-# Marca local (GitHub / projeto)
 PASTA_MARCA = SCRIPT_DIR / "marca"
 PASTA_ICONES = PASTA_MARCA / "icones"
 PASTA_LOGO = PASTA_MARCA / "logo"
 PASTA_FONTES = PASTA_MARCA / "fontes"
 
 
-@st.cache_resource
 def conectar_google():
+    """Autentica via st.secrets['google_credentials']."""
     try:
+        import streamlit as st
+
         creds_dict = dict(st.secrets["google_credentials"])
         creds = service_account.Credentials.from_service_account_info(
             creds_dict, scopes=SCOPES
@@ -46,7 +51,6 @@ def conectar_google():
 def buscar_id_por_nome(service, nome_item, id_pasta_pai):
     if not service or not id_pasta_pai:
         return None
-
     query = (
         f"'{id_pasta_pai}' in parents "
         f"and name = '{nome_item}' "
@@ -69,7 +73,6 @@ def buscar_id_por_nome(service, nome_item, id_pasta_pai):
 def buscar_pasta_imovel_por_codigo(service, codigo_imovel, id_pasta_imoveis):
     if not service or not id_pasta_imoveis:
         return None
-
     codigo = codigo_imovel.strip().upper()
     query = (
         f"'{id_pasta_imoveis}' in parents "
@@ -87,7 +90,6 @@ def buscar_pasta_imovel_por_codigo(service, codigo_imovel, id_pasta_imoveis):
         files = results.get("files", [])
         if not files:
             return None
-
         for f in files:
             nome = f["name"].strip().upper()
             if (
@@ -107,42 +109,44 @@ def obter_id_pasta_imovel(service, codigo_imovel):
     if not id_portfolio:
         print("Pasta PORTFOLIO nao encontrada.", flush=True)
         return None
-
     id_imoveis = buscar_id_por_nome(service, "IMOVEIS", id_portfolio)
     if not id_imoveis:
         print("Pasta IMOVEIS nao encontrada.", flush=True)
         return None
-
     id_imovel = buscar_pasta_imovel_por_codigo(service, codigo_imovel, id_imoveis)
     if not id_imovel:
         print(f"Pasta do imovel '{codigo_imovel}' nao encontrada.", flush=True)
         return None
-
     return id_imovel
 
 
-def baixar_arquivo_por_id(service, id_arquivo, caminho_local):
+def baixar_bytes(service, id_arquivo):
+    """Baixa arquivo do Drive direto para bytes (RAM)."""
     try:
-        caminho_local = Path(caminho_local)
-        caminho_local.parent.mkdir(parents=True, exist_ok=True)
         request = service.files().get_media(fileId=id_arquivo)
-        fh = io.FileIO(str(caminho_local), "wb")
-        downloader = MediaIoBaseDownload(fh, request)
+        memoria = io.BytesIO()
+        downloader = MediaIoBaseDownload(memoria, request)
         done = False
         while not done:
-            status, done = downloader.next_chunk()
-        return True
+            _, done = downloader.next_chunk()
+        return memoria.getvalue()
     except Exception as e:
         print(f"Erro ao baixar arquivo {id_arquivo}: {e}", flush=True)
-        return False
+        return None
+
+
+def bytes_para_data_uri(data, mime_type):
+    if not data:
+        return ""
+    b64 = base64.b64encode(data).decode("ascii")
+    return f"data:{mime_type};base64,{b64}"
 
 
 def carregar_icone_local(nome_arquivo, cor=None):
     caminho = PASTA_ICONES / nome_arquivo
     if not caminho.exists():
         return ""
-    with open(caminho, "r", encoding="utf-8") as f:
-        svg = f.read()
+    svg = caminho.read_text(encoding="utf-8")
     if cor:
         for antigo in ("currentColor", "#000000", "#000", "black"):
             svg = svg.replace(antigo, cor)
@@ -163,7 +167,6 @@ def fonte_local(subpasta, nome_arquivo):
     caminho = PASTA_FONTES / subpasta / nome_arquivo
     if caminho.exists():
         return caminho.as_uri()
-    # fallback: busca em qualquer subpasta de fontes
     if PASTA_FONTES.exists():
         for encontrado in PASTA_FONTES.rglob(nome_arquivo):
             if encontrado.is_file():
@@ -186,20 +189,15 @@ def ler_dados_sheets(sheets, codigo_imovel):
         rows = result.get("values", [])
         if not rows:
             return {}
-
         cabecalho = [normalizar(h) for h in rows[0]]
         codigo_busca = normalizar(codigo_imovel)
-
         for row in rows[1:]:
             if not row:
                 continue
             while len(row) < len(cabecalho):
                 row.append("")
             if normalizar(row[0]) == codigo_busca:
-                dados = {}
-                for i, chave in enumerate(cabecalho):
-                    dados[chave] = row[i] if i < len(row) else ""
-                return dados
+                return {cabecalho[i]: row[i] for i in range(len(cabecalho))}
         return {}
     except Exception as e:
         print(f"Erro ao ler Google Sheets: {e}", flush=True)
@@ -332,7 +330,7 @@ HTML_LAYOUT = """
             </div>
             <div class="spec-divider"></div>
             <div class="spec-row">
-                <div class="spec-icon-box">{{ svg__campo2 | safe }}</div>
+                <div class="spec-icon-box">{{ svg_campo2 | safe }}</div>
                 <div class="spec-text-box">
                     <span class="spec-label">{{ label_campo2 }}</span>
                     <span class="spec-value">{{ valor_campo2 }}</span>
@@ -408,13 +406,11 @@ def sanitizar_nome_arquivo(nome):
 
 def gerar_pdf(codigo_imovel):
     """
-    Gera o dossie em memoria.
-    Retorna bytes do PDF, ou None se falhar.
-    Nao faz upload no Google Drive.
+    Retorna bytes do PDF, ou None.
+    Nao grava no Google Drive. Nao abre interface.
     """
     drive, sheets = conectar_google()
     if not drive or not sheets:
-        print("Falha na autenticacao Google.", flush=True)
         return None
 
     codigo_imovel = str(codigo_imovel).strip().upper()
@@ -438,41 +434,30 @@ def gerar_pdf(codigo_imovel):
     try:
         arquivos_fotos = []
         page_token = None
-
         while True:
             resposta = drive.files().list(
                 q=f"'{id_pasta_fotos}' in parents and trashed = false",
-                fields="nextPageToken, files(id, name, mimeType, size)",
+                fields="nextPageToken, files(id, name, mimeType)",
                 orderBy="name",
                 pageSize=1000,
                 pageToken=page_token,
                 supportsAllDrives=True,
                 includeItemsFromAllDrives=True,
             ).execute()
-
             arquivos_fotos.extend(resposta.get("files", []))
             page_token = resposta.get("nextPageToken")
             if not page_token:
                 break
 
-        temp_fotos_dir = SCRIPT_DIR / "temp_fotos" / codigo_imovel
-        temp_fotos_dir.mkdir(parents=True, exist_ok=True)
         fotos = []
-
         for arquivo in sorted(arquivos_fotos, key=lambda x: x.get("name", "").lower()):
-            nome_f = arquivo.get("name", "")
             mime_type = arquivo.get("mimeType", "")
-
             if not mime_type.startswith("image/"):
                 continue
-
-            caminho_local = temp_fotos_dir / nome_f
-            if not caminho_local.exists():
-                if not baixar_arquivo_por_id(drive, arquivo["id"], caminho_local):
-                    continue
-
-            if caminho_local.exists():
-                fotos.append(caminho_local.as_uri())
+            data = baixar_bytes(drive, arquivo["id"])
+            if not data:
+                continue
+            fotos.append(bytes_para_data_uri(data, mime_type))
 
     except Exception as e:
         print(f"Erro ao listar/baixar fotos: {e}", flush=True)
@@ -485,47 +470,55 @@ def gerar_pdf(codigo_imovel):
     foto_capa = fotos[0]
     fotos_galeria = fotos[1:] if len(fotos) > 1 else []
 
-    logo_uri = buscar_logo_local()
-    fonte_cormorant_medium = fonte_local("CORMORANT GARAMOND", "CormorantGaramond-Medium.ttf")
-    fonte_cormorant_semibold = fonte_local("CORMORANT GARAMOND", "CormorantGaramond-SemiBold.ttf")
-    fonte_manrope_regular = fonte_local("MANROPE", "Manrope-Regular.ttf")
-    fonte_manrope_medium = fonte_local("MANROPE", "Manrope-Medium.ttf")
-    fonte_manrope_semibold = fonte_local("MANROPE", "Manrope-SemiBold.ttf")
-
     tipo_imovel = get_dado(dados, "TIPO", default="IMOVEL")
     tipo_lower = tipo_imovel.lower()
 
     if "apartamento" in tipo_lower:
-        label_campo1 = "Area Util"
-        valor_campo1 = get_dado(dados, "AREA UTIL")
-        icone_campo1 = "area.svg"
-        label_campo2 = "Andar"
-        valor_campo2 = get_dado(dados, "ANDAR")
-        icone_campo2 = "andar.svg"
-        label_campo3 = "IPTU"
-        valor_campo3 = get_dado(dados, "IPTU")
-        icone_campo3 = "iptu.svg"
+        label_campo1, valor_campo1, icone_campo1 = (
+            "Area Util",
+            get_dado(dados, "AREA UTIL"),
+            "area.svg",
+        )
+        label_campo2, valor_campo2, icone_campo2 = (
+            "Andar",
+            get_dado(dados, "ANDAR"),
+            "andar.svg",
+        )
+        label_campo3, valor_campo3, icone_campo3 = (
+            "IPTU",
+            get_dado(dados, "IPTU"),
+            "iptu.svg",
+        )
     else:
-        label_campo1 = "Area Util"
-        valor_campo1 = get_dado(dados, "AREA UTIL")
-        icone_campo1 = "area.svg"
-        label_campo2 = "Area do Terreno"
-        valor_campo2 = get_dado(dados, "AREA TOTAL")
-        icone_campo2 = "terreno.svg"
-        label_campo3 = "IPTU"
-        valor_campo3 = get_dado(dados, "IPTU")
-        icone_campo3 = "iptu.svg"
+        label_campo1, valor_campo1, icone_campo1 = (
+            "Area Util",
+            get_dado(dados, "AREA UTIL"),
+            "area.svg",
+        )
+        label_campo2, valor_campo2, icone_campo2 = (
+            "Area do Terreno",
+            get_dado(dados, "AREA TOTAL"),
+            "terreno.svg",
+        )
+        label_campo3, valor_campo3, icone_campo3 = (
+            "IPTU",
+            get_dado(dados, "IPTU"),
+            "iptu.svg",
+        )
 
-    template = Template(HTML_LAYOUT)
-    html_rendered = template.render(
+    html_rendered = Template(HTML_LAYOUT).render(
         foto_capa=foto_capa,
         fotos_galeria=fotos_galeria,
-        logo_uri=logo_uri,
-        fonte_cormorant_medium=fonte_cormorant_medium,
-        fonte_cormorant_semibold=fonte_cormorant_semibold,
-        fonte_manrope_regular=fonte_manrope_regular,
-        fonte_manrope_medium=fonte_manrope_medium,
-        fonte_manrope_semibold=fonte_manrope_semibold,
+        logo_uri=buscar_logo_local(),
+        fonte_cormorant_medium=fonte_local(
+            "CORMORANT GARAMOND", "CormorantGaramond-Medium.ttf"
+        ),
+        fonte_cormorant_semibold=fonte_local(
+            "CORMORANT GARAMOND", "CormorantGaramond-SemiBold.ttf"
+        ),
+        fonte_manrope_regular=fonte_local("MANROPE", "Manrope-Regular.ttf"),
+        fonte_manrope_medium=fonte_local("MANROPE", "Manrope-Medium.ttf"),
+        fonte_manrope_semibold=fonte_local("MANROPE", "Manrope-SemiBold.ttf"),
         svg_localizacao=carregar_icone_local("localizacao.svg", "#f4f1ea"),
         svg_dormitorios=carregar_icone_local("dormitorios.svg", "#06192a"),
         svg_suites=carregar_icone_local("suites.svg", "#06192a"),
@@ -554,51 +547,14 @@ def gerar_pdf(codigo_imovel):
         vagas=get_dado(dados, "VAGAS"),
     )
 
-    # Gera PDF apenas em memoria — sem upload no Drive
     pdf_buffer = io.BytesIO()
-    weasyprint.HTML(
-        string=html_rendered,
-        base_url=str(SCRIPT_DIR),
-    ).write_pdf(pdf_buffer)
-
+    weasyprint.HTML(string=html_rendered, base_url=str(SCRIPT_DIR)).write_pdf(
+        pdf_buffer
+    )
     pdf_bytes = pdf_buffer.getvalue()
+
     if len(pdf_bytes) < 10000:
         print("PDF gerado parece vazio ou incompleto.", flush=True)
         return None
 
     return pdf_bytes
-
-
-# -------------------------------------------------
-# INTERFACE STREAMLIT (pagina avulsa)
-# -------------------------------------------------
-st.set_page_config(
-    page_title="Gerador de Dossie Imobiliario",
-    layout="centered",
-)
-
-st.title("Gerador de Dossie - Carvalho Ferreira")
-st.write("Digite o codigo do imovel para gerar o PDF e baixar no computador.")
-
-codigo_input = st.text_input("Codigo do Imovel:", key="codigo_imovel_baixar",)
-
-if st.button("Gerar Dossie do Imovel", type="primary"):
-    if not codigo_input:
-        st.warning("Informe o codigo do imovel.")
-    else:
-        with st.spinner("Buscando dados e gerando PDF..."):
-            pdf_bytes = gerar_pdf(codigo_input)
-
-        if pdf_bytes:
-            st.success("Dossie gerado com sucesso.")
-            st.download_button(
-                label="Baixar PDF do Dossie",
-                data=pdf_bytes,
-                file_name=f"{sanitizar_nome_arquivo(codigo_input)}.pdf",
-                mime="application/pdf",
-            )
-        else:
-            st.error(
-                "Nao foi possivel gerar o PDF. Verifique o codigo, "
-                "a pasta do imovel no Drive, as fotos e as permissoes da service account."
-            )
