@@ -371,38 +371,38 @@ def processar_foto_bytes(
             Image.Resampling.LANCZOS,
         )
 
-# --------------------------------------------------------
-# AJUSTES FOTOGRÁFICOS
-# --------------------------------------------------------
+        # --------------------------------------------------------
+        # AJUSTES FOTOGRÁFICOS
+        # --------------------------------------------------------
 
-img = ImageEnhance.Color(
-    img
-).enhance(
-    SATURACAO
-)
+        img = ImageEnhance.Color(
+            img
+        ).enhance(
+            SATURACAO
+        )
 
-img = ImageEnhance.Contrast(
-    img
-).enhance(
-    CONTRASTE
-)
+        img = ImageEnhance.Contrast(
+            img
+        ).enhance(
+            CONTRASTE
+        )
 
-img = ImageEnhance.Brightness(
-    img
-).enhance(
-    BRILHO
-)
+        img = ImageEnhance.Brightness(
+            img
+        ).enhance(
+            BRILHO
+        )
 
-img = aquecer_imagem(
-    img,
-    TEMPERATURA,
-)
+        img = aquecer_imagem(
+            img,
+            TEMPERATURA,
+        )
 
-img = ImageEnhance.Sharpness(
-    img
-).enhance(
-    NITIDEZ
-)
+        img = ImageEnhance.Sharpness(
+            img
+        ).enhance(
+            NITIDEZ
+        )
 
         # --------------------------------------------------------
         # IDENTIDADE VISUAL
