@@ -19,6 +19,7 @@ from PIL import (
 
 SATURACAO = 1.00
 CONTRASTE = 1.02
+BRILHO = 1.03
 TEMPERATURA = 6
 NITIDEZ = 1.00
 
@@ -370,7 +371,7 @@ def processar_foto_bytes(
             Image.Resampling.LANCZOS,
         )
 
-   # --------------------------------------------------------
+# --------------------------------------------------------
 # AJUSTES FOTOGRÁFICOS
 # --------------------------------------------------------
 
