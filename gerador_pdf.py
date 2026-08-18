@@ -259,10 +259,10 @@ HTML_LAYOUT = """
         .logo-subtitle { font-size: 8pt; letter-spacing: 1.8px; color: #94a3b8; margin-top: 6px; text-transform: uppercase; }
         .header-info { width: 100%; margin-top: 4px; }
         .tipo-imovel { font-family: 'Cormorant Garamond', serif; width: 100%; font-size: 17pt; font-weight: 500; letter-spacing: 1.3px; color: #94a3b8; margin: 0; line-height: 1; }
-        .destaque-imovel { font-family: 'Cormorant Garamond', serif; width: 100%; font-size: 25pt; font-weight: 600; letter-spacing: 1.2px; margin-top: 3px; color: #F7F5F0; line-height: 1; overflow-wrap: anywhere; }
+        .destaque-imovel { font-family: 'Cormorant Garamond', serif; width: 100%; font-size: 23pt; font-weight: 600; letter-spacing: 1.2px; margin-top: 3px; color: #F7F5F0; line-height: 1; overflow-wrap: anywhere; }
         .nome-imovel { width: 100%; font-size: 13pt; color: #F7F5F0; font-weight: 300; margin-top: 8px; letter-spacing: 0.8px; overflow-wrap: anywhere; }
         .valor-imovel { font-size: 24pt; font-weight: 600; color: #F7F5F0; letter-spacing: 0.8px; margin-top: 50px; margin-bottom: 4px; text-align: center; width: 100%; }
-        .location-container { height: auto; width: 100%; display: flex; align-items: flex-end; margin-top: 150px; margin-bottom: 6px; }
+        .location-container { width: 100%; display: flex; align-items: flex-end; margin-top: 150px; margin-bottom: 6px; }
         .location-icon-box { width: 35px; height: 35px; margin-right: 8px; flex-shrink: 0; margin-top: 1px; }
         .location-icon-box svg { width: 100%; height: 100%; }
         .localizacao-topo { min-width: 0; font-size: 8.5pt; letter-spacing: 0.8px; color: #94a3b8; text-transform: uppercase; line-height: 1.4; overflow-wrap: anywhere; }
