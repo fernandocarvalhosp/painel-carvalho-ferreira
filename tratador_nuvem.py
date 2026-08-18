@@ -2,6 +2,7 @@
 
 import io
 import os
+import zipfile
 
 from PIL import (
     Image,
@@ -86,6 +87,7 @@ def aplicar_logo_bytes(img, logo_bytes):
         return img
 
     logo_stream = None
+    logo = None
 
     try:
 
@@ -119,7 +121,6 @@ def aplicar_logo_bytes(img, logo_bytes):
             largura_logo <= 0
             or logo.width <= 0
         ):
-            logo.close()
             return img
 
         proporcao = (
@@ -131,7 +132,6 @@ def aplicar_logo_bytes(img, logo_bytes):
         )
 
         if altura_logo <= 0:
-            logo.close()
             return img
 
         logo = logo.resize(
@@ -174,8 +174,6 @@ def aplicar_logo_bytes(img, logo_bytes):
             ),
         )
 
-        logo.close()
-
         return img.convert("RGB")
 
     except Exception as erro:
@@ -186,6 +184,15 @@ def aplicar_logo_bytes(img, logo_bytes):
         )
 
         return img
+
+    finally:
+
+        if logo is not None:
+
+            try:
+                logo.close()
+            except Exception:
+                pass
 
 
 # =============================================================================
@@ -314,7 +321,8 @@ def processar_foto_bytes(
     codigo,
 ):
     """
-    Recebe a foto original em memória.
+    Recebe a foto original em memória
+    e devolve a foto tratada em memória.
     """
 
     img = None
@@ -447,7 +455,8 @@ def obter_logo_bytes(
     service,
 ):
     """
-    Localiza o primeiro arquivo de imagem dentro da pasta LOGO.
+    Localiza o primeiro arquivo de imagem
+    dentro da pasta LOGO.
     """
 
     if not service:
@@ -543,6 +552,91 @@ def obter_logo_bytes(
 
 
 # =============================================================================
+# GERAR ZIP EM MEMÓRIA
+# =============================================================================
+
+def gerar_zip_fotos(
+    fotos_tratadas,
+    codigo_imovel,
+):
+    """
+    Recebe uma lista de fotos tratadas e
+    gera um ZIP totalmente em memória.
+
+    Não cria arquivo físico no servidor.
+    """
+
+    if not fotos_tratadas:
+        return None
+
+    zip_buffer = io.BytesIO()
+
+    try:
+
+        with zipfile.ZipFile(
+            zip_buffer,
+            mode="w",
+            compression=zipfile.ZIP_DEFLATED,
+            compresslevel=6,
+        ) as zip_file:
+
+            for item in fotos_tratadas:
+
+                nome = item.get(
+                    "nome",
+                    "foto.jpg",
+                )
+
+                dados = item.get(
+                    "dados",
+                )
+
+                if not dados:
+                    continue
+
+                if isinstance(
+                    dados,
+                    io.BytesIO,
+                ):
+                    dados.seek(0)
+                    conteudo = dados.read()
+
+                elif isinstance(
+                    dados,
+                    (bytes, bytearray),
+                ):
+                    conteudo = bytes(
+                        dados
+                    )
+
+                else:
+                    continue
+
+                zip_file.writestr(
+                    nome,
+                    conteudo,
+                )
+
+        zip_buffer.seek(0)
+
+        return zip_buffer
+
+    except Exception as erro:
+
+        print(
+            f"Erro ao gerar ZIP: {erro}",
+            flush=True,
+        )
+
+        try:
+            zip_buffer.close()
+        except Exception:
+            pass
+
+        return None
+
+
+# =============================================================================
 # EXECUÇÃO DO TRATAMENTO DO IMÓVEL
 # =============================================================================
 
@@ -552,15 +646,18 @@ def executar_tratamento_imovel(
     logo_bytes=None,
 ):
     """
-    Executa o tratamento completo.
+    Busca as fotos no Google Drive,
+    trata as imagens e devolve um ZIP
+    em memória.
+
+    Nenhum arquivo tratado é enviado
+    de volta ao Google Drive.
     """
 
     from drive_service import (
         encontrar_pasta_imovel,
-        criar_pasta_se_nao_existir,
         listar_itens_pasta,
         baixar_foto_bytes,
-        enviar_foto_tratada,
     )
 
     codigo_imovel = str(
@@ -568,12 +665,10 @@ def executar_tratamento_imovel(
     ).strip().upper()
 
     if not codigo_imovel:
-
-        return False
+        return None
 
     if service is None:
-
-        return False
+        return None
 
     # --------------------------------------------------------
     # LOCALIZA IMÓVEL
@@ -585,22 +680,7 @@ def executar_tratamento_imovel(
     )
 
     if not id_pasta_imovel:
-
-        return False
-
-    # --------------------------------------------------------
-    # PASTA FOTOS TRATADAS
-    # --------------------------------------------------------
-
-    id_pasta_tratadas = criar_pasta_se_nao_existir(
-        service,
-        "FOTOS TRATADAS",
-        id_pasta_imovel,
-    )
-
-    if not id_pasta_tratadas:
-
-        return False
+        return None
 
     # --------------------------------------------------------
     # CARREGAR LOGO
@@ -635,7 +715,9 @@ def executar_tratamento_imovel(
             "",
         ).lower()
 
-        if mime_type == "application/vnd.google-apps.folder":
+        if mime_type == (
+            "application/vnd.google-apps.folder"
+        ):
             continue
 
         if mime_type.startswith(
@@ -668,25 +750,22 @@ def executar_tratamento_imovel(
     )
 
     if not imagens:
-
-        return False
-
-    total = len(
-        imagens
-    )
-
-    sucesso = 0
+        return None
 
     # --------------------------------------------------------
-    # PROCESSAMENTO INDIVIDUAL
+    # PROCESSAMENTO
     # --------------------------------------------------------
+
+    fotos_tratadas = []
 
     for indice, arquivo in enumerate(
         imagens,
         start=1,
     ):
 
-        file_id = arquivo["id"]
+        file_id = arquivo.get(
+            "id"
+        )
 
         nome_original = arquivo.get(
             "name",
@@ -697,6 +776,9 @@ def executar_tratamento_imovel(
         stream_tratado = None
 
         try:
+
+            if not file_id:
+                continue
 
             stream_bruto = baixar_foto_bytes(
                 service,
@@ -723,18 +805,32 @@ def executar_tratamento_imovel(
                 f"{nome_base}.jpg"
             )
 
-            enviado = enviar_foto_tratada(
-                service,
-                id_pasta_tratadas,
-                nome_saida,
-                stream_tratado,
+            # ------------------------------------------------
+            # COPIA OS BYTES PARA O RESULTADO
+            # ------------------------------------------------
+
+            stream_tratado.seek(0)
+
+            dados_foto = (
+                stream_tratado.read()
             )
 
-            if enviado:
-                sucesso += 1
+            if not dados_foto:
+                continue
 
-        except Exception:
-            pass
+            fotos_tratadas.append(
+                {
+                    "nome": nome_saida,
+                    "dados": dados_foto,
+                }
+            )
+
+        except Exception as erro:
+
+            print(
+                f"Erro na foto {nome_original}: {erro}",
+                flush=True,
+            )
 
         finally:
 
@@ -745,8 +841,10 @@ def executar_tratamento_imovel(
                     "close",
                 )
             ):
-                try: stream_bruto.close()
-                except Exception: pass
+                try:
+                    stream_bruto.close()
+                except Exception:
+                    pass
 
             if (
                 stream_tratado is not None
@@ -755,10 +853,85 @@ def executar_tratamento_imovel(
                     "close",
                 )
             ):
-                try: stream_tratado.close()
-                except Exception: pass
+                try:
+                    stream_tratado.close()
+                except Exception:
+                    pass
 
-    return sucesso > 0
+    if not fotos_tratadas:
+        return None
+
+    # --------------------------------------------------------
+    # GERA ZIP
+    # --------------------------------------------------------
+
+    zip_buffer = gerar_zip_fotos(
+        fotos_tratadas,
+        codigo_imovel,
+    )
+
+    # --------------------------------------------------------
+    # LIBERA MEMÓRIA DAS FOTOS INDIVIDUAIS
+    # --------------------------------------------------------
+
+    fotos_tratadas.clear()
+
+    return zip_buffer
+
+
+# =============================================================================
+# CONEXÃO COM GOOGLE DRIVE
+# =============================================================================
+
+def obter_service():
+    """
+    Cria a conexão com o Google Drive usando
+    os secrets do Streamlit.
+    """
+
+    try:
+
+        import streamlit as st
+
+        creds_dict = dict(
+            st.secrets[
+                "google_credentials"
+            ]
+        )
+
+        from google.oauth2 import (
+            service_account,
+        )
+
+        from googleapiclient.discovery import (
+            build,
+        )
+
+        from drive_service import SCOPES
+
+        creds = (
+            service_account
+            .Credentials
+            .from_service_account_info(
+                creds_dict,
+                scopes=SCOPES,
+            )
+        )
+
+        return build(
+            "drive",
+            "v3",
+            credentials=creds,
+        )
+
+    except Exception as erro:
+
+        print(
+            f"Erro na conexão com Google Drive: {erro}",
+            flush=True,
+        )
+
+        return None
 
 
 # =============================================================================
@@ -770,6 +943,10 @@ def tratar(
     service=None,
     logo_bytes=None,
 ):
+    """
+    Trata as fotos do imóvel e devolve
+    o ZIP em memória.
+    """
 
     try:
 
@@ -778,34 +955,29 @@ def tratar(
         ).strip().upper()
 
         if not codigo_imovel:
-            return "Informe o código."
+            return None
 
         if service is None:
 
-            try:
-                import streamlit as st
-                creds_dict = dict(st.secrets["google_credentials"])
-                from google.oauth2 import service_account
-                from googleapiclient.discovery import build
-                from drive_service import SCOPES
-                creds = service_account.Credentials.from_service_account_info(
-                    creds_dict,
-                    scopes=SCOPES,
-                )
-                service = build("drive", "v3", credentials=creds)
-            except Exception:
-                return "Erro na conexão."
+            service = obter_service()
 
-        resultado = executar_tratamento_imovel(
+        if service is None:
+            return None
+
+        return executar_tratamento_imovel(
             service,
             codigo_imovel,
             logo_bytes,
         )
 
-        return "Sucesso" if resultado else "Erro"
+    except Exception as erro:
 
-    except Exception:
-        return "Erro"
+        print(
+            f"Erro no tratamento: {erro}",
+            flush=True,
+        )
+
+        return None
 
 
 def tratar_fotos(
@@ -813,6 +985,10 @@ def tratar_fotos(
     service=None,
     logo_bytes=None,
 ):
+    """
+    Compatibilidade com o restante do aplicativo.
+    """
+
     return tratar(
         codigo_imovel,
         service=service,
