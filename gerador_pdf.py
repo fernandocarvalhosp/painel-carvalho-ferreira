@@ -379,7 +379,7 @@ HTML_LAYOUT = """
         <div class="footer-content">
             <div>
                 <div class="footer-brand">CARVALHO FERREIRA</div>
-                <div style="font-size: 7.5pt; color: #718096; margin-top: 2px;">TRANSFORMA NEGOCIOS EM CONQUISTAS.</div>
+                <div style="font-size: 7.5pt; color: #718096; margin-top: 2px;">CARVALHO FERREIRA</div>
             </div>
             <div style="text-align: right;">
                 <div style="font-weight: bold; color: #06192a;">CONSULTORIA IMOBILIARIA</div>
