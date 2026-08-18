@@ -348,7 +348,7 @@ HTML_LAYOUT = """
         <div class="details-area">
             <div class="description-wrapper">
                 {% if observacao and observacao != '-' %}
-                    <span class="diferencial-destaque">OBS: {{ observacao }}</span>
+                    <span class="diferencial-destaque">DESTAQUES: {{ observacao }}</span>
                 {% endif %}
                 <div class="description">{{ descricao }}</div>
             </div>
