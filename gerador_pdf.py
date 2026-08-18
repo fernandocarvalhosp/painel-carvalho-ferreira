@@ -262,7 +262,7 @@ HTML_LAYOUT = """
         .destaque-imovel { font-family: 'Cormorant Garamond', serif; width: 100%; font-size: 21pt; font-weight: 600; letter-spacing: 1.1px; margin-top: 3px; margin: 0; color: #F7F5F0; line-height: 1; overflow-wrap: anywhere; }
         .nome-imovel { width: 100%; font-size: 13pt; color: #F7F5F0; font-weight: 300; margin-top: 8px; letter-spacing: 0.8px; overflow-wrap: anywhere; }
         .valor-imovel { font-size: 24pt; font-weight: 600; color: #F7F5F0; letter-spacing: 0.8px; margin-top: 50px; margin-bottom: 4px; text-align: center; width: 100%; }
-        .location-container { width: 100%; display: flex; align-items: flex-end; position fixed; top: 1000px; left: 50px; }
+        .location-container { width: 100%; display: flex; align-items: flex-end; position fixed; top: 1400px; left: 50px; }
         .location-icon-box { width: 35px; height: 35px; margin-right: 8px; flex-shrink: 0; margin-top: 1px; }
         .location-icon-box svg { width: 100%; height: 100%; }
         .localizacao-topo { min-width: 0; font-size: 8.5pt; letter-spacing: 0.8px; color: #94a3b8; text-transform: uppercase; line-height: 1.4; overflow-wrap: anywhere; }
