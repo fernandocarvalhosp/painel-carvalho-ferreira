@@ -209,7 +209,7 @@ def baixar_arquivo(service, file_id):
 st.title("📂 Materiais do Imóvel")
 
 # Código do imóvel (vindo da página principal)
-codigo = st.session_state.get("codigo_materiais") or st.session_state.get("codigo_busca", "")
+codigo = st.session_state.get("") or st.session_state.get("codigo_busca", "")
 
 if not codigo:
     st.warning("Nenhum imóvel selecionado. Volte para a página principal e busque um imóvel.")
