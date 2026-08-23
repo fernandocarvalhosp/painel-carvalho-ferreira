@@ -197,7 +197,7 @@ def carregar_imoveis_sheets():
 
 
 # =============================================================================
-# BUSCA DE FOTO EXCLUSIVA NA PASTA MINIATURA
+# BUSCA DA FOTO EXCLUSIVA NA PASTA MINIATURA DO DRIVE
 # =============================================================================
 
 @st.cache_data(ttl=600)
@@ -205,6 +205,7 @@ def obter_primeira_foto_drive(codigo):
     try:
         drive, _ = conectar_google()
         
+        # 1. Encontra a pasta principal do imóvel pelo código
         query_pasta = f"name contains '{codigo}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
         res_pasta = drive.files().list(q=query_pasta, pageSize=5, fields="files(id, name)").execute()
         pastas = res_pasta.get("files", [])
@@ -221,20 +222,26 @@ def obter_primeira_foto_drive(codigo):
         if not id_imovel:
             return None
 
+        # 2. Busca obrigatoriamente a subpasta de miniaturas dentro da pasta do imóvel
         res_sub = drive.files().list(q=f"'{id_imovel}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false", fields="files(id, name)").execute()
         subpastas = res_sub.get("files", [])
         
         id_miniatura = None
         for sub in subpastas:
-            nome_sub = sub["name"].upper()
-            if "MINIATURA" in nome_sub or "CAPA" in nome_sub:
+            if "MINIATURA" in sub["name"].upper():
                 id_miniatura = sub["id"]
                 break
                 
         if not id_miniatura:
             return None
 
-        res_arq = drive.files().list(q=f"'{id_miniatura}' in parents and mimeType contains 'image/' and trashed = false", orderBy="name", pageSize=1, fields="files(id)").execute()
+        # 3. Pega a primeira imagem de dentro da subpasta "MINIATURA"
+        res_arq = drive.files().list(
+            q=f"'{id_miniatura}' in parents and mimeType contains 'image/' and trashed = false", 
+            orderBy="name", 
+            pageSize=1, 
+            fields="files(id)"
+        ).execute()
         arquivos = res_arq.get("files", [])
         
         if arquivos:
