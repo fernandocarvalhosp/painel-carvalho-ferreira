@@ -125,7 +125,15 @@ def salvar_dados(codigo, novos_dados):
 
         for i, row in enumerate(rows):
             if row and normalizar(row[0]) == normalizar(codigo):
-                range_to_update = f"'{NOME_ABA}'!A{i + 1}:AZ{i + 1}"
+                # Calcula dinamicamente a letra da coluna final com base na quantidade de campos salvos
+                # (Ex: até 26 colunas usa A-Z, acima disso usa AB, AC, etc.)
+                col_num = len(novos_dados)
+                coluna_final = ""
+                while col_num > 0:
+                    col_num, remainder = divmod(col_num - 1, 26)
+                    coluna_final = chr(65 + remainder) + coluna_final
+
+                range_to_update = f"'{NOME_ABA}'!A{i + 1}:{coluna_final}{i + 1}"
                 body = {"values": [novos_dados]}
                 service.spreadsheets().values().update(
                     spreadsheetId=SPREADSHEET_ID,
@@ -252,7 +260,6 @@ def executar_tratador_fotos(codigo_imovel):
         return False, f"Erro no tratamento: {e}"
 
 
-# Inicialização de variáveis de sessão
 for var, val in [
     ("codigo_busca", ""),
     ("dados_imovel", None),
@@ -264,7 +271,6 @@ for var, val in [
         st.session_state[var] = val
 
 
-# Interface Principal
 st.title("Carvalho Ferreira")
 st.caption("Painel de gestao e geracao de materiais")
 
@@ -305,7 +311,6 @@ if codigo_busca and dados_imovel:
     st.success(f"Imóvel **{codigo_busca}** carregado com sucesso!")
 
 
-# Sidebar
 st.sidebar.markdown("### Materiais & Ações")
 st.sidebar.markdown("---")
 
@@ -411,7 +416,6 @@ if st.session_state.get("fotos_tratadas_zip"):
     )
 
 
-# Abas de Conteúdo
 tab1, tab2, tab3 = st.tabs(["Identificacao", "Dados Tecnicos", "Divulgacao"])
 
 with tab1:
