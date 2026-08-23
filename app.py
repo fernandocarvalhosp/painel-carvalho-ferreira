@@ -9,7 +9,7 @@ from googleapiclient.http import MediaIoBaseDownload
 
 
 # =============================================================================
-# CONFIGURAÇÕES DA PÁGINA (Com Ocultação da Navegação Automática)
+# CONFIGURAÇÕES DA PÁGINA
 # =============================================================================
 
 st.set_page_config(
@@ -175,7 +175,8 @@ def carregar_imoveis_sheets():
             dados = {cabecalho[i]: row[i] for i in range(len(cabecalho))}
             
             codigo = dados.get("CODIGO") or dados.get("CÓDIGO") or row[0]
-            titulo = dados.get("TITULO 1") or dados.get("TITULO") or ""
+            # Buscando especificamente pela coluna TIPO (ou CATEGORIA caso não ache)
+            tipo = dados.get("TIPO") or dados.get("CATEGORIA") or "Imóvel"
             bairro = dados.get("BAIRRO") or ""
             cidade = dados.get("CIDADE") or ""
             valor = dados.get("VALOR") or "Sob consulta"
@@ -183,7 +184,7 @@ def carregar_imoveis_sheets():
             
             imoveis.append({
                 "codigo": codigo,
-                "titulo": titulo,
+                "tipo": tipo,
                 "bairro": bairro,
                 "cidade": cidade,
                 "valor": valor,
@@ -288,7 +289,7 @@ st.sidebar.markdown("---")
 bairros_disponiveis = sorted(list(set([i["bairro"] for i in lista_imoveis if i["bairro"]])))
 filtro_bairro = st.sidebar.selectbox("Bairro / Região", ["Todos"] + bairros_disponiveis, key="filtro_bairro")
 
-busca_texto = st.sidebar.text_input("Buscar por Código ou Título", placeholder="Ex: AP0018 ou Jardins", key="busca_texto")
+busca_texto = st.sidebar.text_input("Buscar por Código ou Tipo", placeholder="Ex: AP0018 ou Casa", key="busca_texto")
 
 filtro_quartos = st.sidebar.selectbox("Dormitórios Mínimos", ["Todos", "1", "2", "3", "4+"], key="filtro_quartos")
 
@@ -307,7 +308,7 @@ for item in lista_imoveis:
     
     if busca_texto:
         termo = normalizar(busca_texto)
-        texto_alvo = normalizar(f"{item['codigo']} {item['titulo']} {item['bairro']} {item['cidade']}")
+        texto_alvo = normalizar(f"{item['codigo']} {item['tipo']} {item['bairro']} {item['cidade']}")
         if termo not in texto_alvo:
             continue
             
@@ -349,8 +350,9 @@ else:
                 st.markdown(f'<div class="codigo-tag">🏷️ {imovel["codigo"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="info-sub">{imovel["bairro"]} • {imovel["cidade"]}</div>', unsafe_allow_html=True)
                 
-                if imovel["titulo"]:
-                    st.markdown(f"**{imovel['titulo']}**")
+                # Exibe o TIPO do imóvel em destaque limpo
+                if imovel["tipo"]:
+                    st.markdown(f"**{imovel['tipo']}**")
                     
                 st.markdown(f'<div class="preco-imovel">{imovel["valor"]}</div>', unsafe_allow_html=True)
                 
