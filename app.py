@@ -175,7 +175,6 @@ def carregar_imoveis_sheets():
             dados = {cabecalho[i]: row[i] for i in range(len(cabecalho))}
             
             codigo = dados.get("CODIGO") or dados.get("CÓDIGO") or row[0]
-            # Buscando especificamente pela coluna TIPO (ou CATEGORIA caso não ache)
             tipo = dados.get("TIPO") or dados.get("CATEGORIA") or "Imóvel"
             bairro = dados.get("BAIRRO") or ""
             cidade = dados.get("CIDADE") or ""
@@ -198,7 +197,7 @@ def carregar_imoveis_sheets():
 
 
 # =============================================================================
-# BUSCA DE FOTO DIRETO DO DRIVE (OTIMIZADO)
+# BUSCA DE FOTO EXCLUSIVA NA PASTA MINIATURA
 # =============================================================================
 
 @st.cache_data(ttl=600)
@@ -225,14 +224,17 @@ def obter_primeira_foto_drive(codigo):
         res_sub = drive.files().list(q=f"'{id_imovel}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false", fields="files(id, name)").execute()
         subpastas = res_sub.get("files", [])
         
-        id_fotos = id_imovel
+        id_miniatura = None
         for sub in subpastas:
             nome_sub = sub["name"].upper()
-            if "FOTOS TRATADAS" in nome_sub or "FOTOS SELECIONADAS" in nome_sub:
-                id_fotos = sub["id"]
+            if "MINIATURA" in nome_sub or "CAPA" in nome_sub:
+                id_miniatura = sub["id"]
                 break
+                
+        if not id_miniatura:
+            return None
 
-        res_arq = drive.files().list(q=f"'{id_fotos}' in parents and mimeType contains 'image/' and trashed = false", orderBy="name", pageSize=1, fields="files(id)").execute()
+        res_arq = drive.files().list(q=f"'{id_miniatura}' in parents and mimeType contains 'image/' and trashed = false", orderBy="name", pageSize=1, fields="files(id)").execute()
         arquivos = res_arq.get("files", [])
         
         if arquivos:
@@ -324,7 +326,7 @@ for item in lista_imoveis:
 
 
 # =============================================================================
-# EXIBIÇÃO DOS RESULTADOS (GRID DE CARDS COM FOTO DO DRIVE)
+# EXIBIÇÃO DOS RESULTADOS (GRID DE CARDS)
 # =============================================================================
 
 st.markdown(f"### Imóveis Encontrados ({len(imoveis_filtrados)})")
@@ -345,12 +347,11 @@ else:
                 if foto_bytes:
                     st.image(foto_bytes, use_container_width=True)
                 else:
-                    st.markdown("🖼️ *Sem imagem na pasta*")
+                    st.markdown("🖼️ *Miniatura não configurada*")
                 
                 st.markdown(f'<div class="codigo-tag">🏷️ {imovel["codigo"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="info-sub">{imovel["bairro"]} • {imovel["cidade"]}</div>', unsafe_allow_html=True)
                 
-                # Exibe o TIPO do imóvel em destaque limpo
                 if imovel["tipo"]:
                     st.markdown(f"**{imovel['tipo']}**")
                     
