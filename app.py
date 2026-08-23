@@ -1,56 +1,21 @@
-import streamlit as st
-
-
-def verificar_senha():
-    # Verifica se a senha já foi digitada corretamente nesta sessão
-    if "senha_correta" not in st.session_state:
-        st.session_state["senha_correta"] = False
-
-    if st.session_state["senha_correta"]:
-        return True
-
-    # Tela de Login simples na interface
-    st.subheader("🔒 Acesso Restrito - Painel Carvalho Ferreira")
-    senha_digitada = st.text_input(
-        "Digite a senha de acesso:",
-        type="password",
-    )
-
-    if st.button("Entrar"):
-        # Compara com a senha salva nos segredos da nuvem
-        if senha_digitada == st.secrets["passwords"]["senha_acesso"]:
-            st.session_state["senha_correta"] = True
-            st.rerun()
-        else:
-            st.error("Senha incorreta. Tente novamente.")
-
-    return False
-
-
-# Trava principal
-if not verificar_senha():
-    st.stop()
-
-
-# -*- coding: utf-8 -*-
-
 import importlib
 from pathlib import Path
 
+import streamlit as st
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 import gerador_pdf
 
 try:
-    import gerar_posts
+  import gerar_posts
 except Exception:
-    gerar_posts = None
+  gerar_posts = None
 
 try:
-    import tratador_nuvem
+  import tratador_nuvem
 except Exception:
-    tratador_nuvem = None
+  tratador_nuvem = None
 
 
 st.set_page_config(
@@ -60,16 +25,41 @@ st.set_page_config(
 
 
 # =============================================================================
+# AUTENTICAÇÃO (SENHA DE ACESSO)
+# =============================================================================
+
+
+def verificar_senha():
+  if "senha_correta" not in st.session_state:
+    st.session_state["senha_correta"] = False
+
+  if st.session_state["senha_correta"]:
+    return True
+
+  st.subheader("🔒 Acesso Restrito - Painel Carvalho Ferreira")
+  senha_digitada = st.text_input("Digite a senha de acesso:", type="password")
+
+  if st.button("Entrar"):
+    if senha_digitada == st.secrets["passwords"]["senha_acesso"]:
+      st.session_state["senha_correta"] = True
+      st.rerun()
+    else:
+      st.error("Senha incorreta. Tente novamente.")
+
+  return False
+
+
+if not verificar_senha():
+  st.stop()
+
+
+# =============================================================================
 # CONFIGURAÇÕES
 # =============================================================================
 
-SCOPES_SHEETS = [
-    "https://www.googleapis.com/auth/spreadsheets"
-]
+SCOPES_SHEETS = ["https://www.googleapis.com/auth/spreadsheets"]
 
-SPREADSHEET_ID = (
-    "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
-)
+SPREADSHEET_ID = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
 
 NOME_ABA = "Imoveis"
 
@@ -84,506 +74,347 @@ SCOPES_DRIVE = [
 # CONEXÃO COM GOOGLE SHEETS
 # =============================================================================
 
+
 @st.cache_resource
 def conectar_sheets():
+  creds_dict = dict(st.secrets["google_credentials"])
 
-    creds_dict = dict(
-        st.secrets["google_credentials"]
-    )
+  creds = service_account.Credentials.from_service_account_info(
+      creds_dict,
+      scopes=SCOPES_SHEETS,
+  )
 
-    creds = (
-        service_account
-        .Credentials
-        .from_service_account_info(
-            creds_dict,
-            scopes=SCOPES_SHEETS,
-        )
-    )
-
-    return build(
-        "sheets",
-        "v4",
-        credentials=creds,
-    )
+  return build(
+      "sheets",
+      "v4",
+      credentials=creds,
+  )
 
 
 # =============================================================================
 # CONEXÃO COM GOOGLE DRIVE
 # =============================================================================
 
+
 @st.cache_resource
 def conectar_drive():
+  creds_dict = dict(st.secrets["google_credentials"])
 
-    creds_dict = dict(
-        st.secrets["google_credentials"]
-    )
+  creds = service_account.Credentials.from_service_account_info(
+      creds_dict,
+      scopes=SCOPES_DRIVE,
+  )
 
-    creds = (
-        service_account
-        .Credentials
-        .from_service_account_info(
-            creds_dict,
-            scopes=SCOPES_DRIVE,
-        )
-    )
-
-    return build(
-        "drive",
-        "v3",
-        credentials=creds,
-    )
+  return build(
+      "drive",
+      "v3",
+      credentials=creds,
+  )
 
 
 # =============================================================================
 # PLANILHA
 # =============================================================================
 
+
 def normalizar(texto):
+  if not texto:
+    return ""
 
-    if not texto:
-        return ""
-
-    return " ".join(
-        str(texto)
-        .strip()
-        .upper()
-        .split()
-    )
+  return " ".join(str(texto).strip().upper().split())
 
 
 def buscar_imovel(codigo):
+  try:
+    service = conectar_sheets()
 
-    try:
-
-        service = conectar_sheets()
-
-        result = (
-            service.spreadsheets()
-            .values()
-            .get(
-                spreadsheetId=SPREADSHEET_ID,
-                range=f"'{NOME_ABA}'!A:Z",
-            )
-            .execute()
+    result = (
+        service.spreadsheets()
+        .values()
+        .get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f"'{NOME_ABA}'!A:Z",
         )
+        .execute()
+    )
 
-        rows = result.get(
-            "values",
-            [],
-        )
+    rows = result.get(
+        "values",
+        [],
+    )
 
-        if not rows:
-            return None
+    if not rows:
+      return None
 
-        cabecalho = [
-            normalizar(h)
-            for h in rows[0]
-        ]
+    cabecalho = [normalizar(h) for h in rows[0]]
 
-        codigo_busca = normalizar(
-            codigo
-        )
+    codigo_busca = normalizar(codigo)
 
-        for row in rows[1:]:
+    for row in rows[1:]:
+      if not row:
+        continue
 
-            if not row:
-                continue
+      while len(row) < len(cabecalho):
+        row.append("")
 
-            while len(row) < len(cabecalho):
-                row.append("")
+      if normalizar(row[0]) == codigo_busca:
+        return {cabecalho[i]: row[i] for i in range(len(cabecalho))}
 
-            if normalizar(row[0]) == codigo_busca:
+    return None
 
-                return {
-                    cabecalho[i]: row[i]
-                    for i in range(
-                        len(cabecalho)
-                    )
-                }
+  except Exception as e:
+    st.error(f"Erro ao conectar na planilha: {e}")
 
-        return None
-
-    except Exception as e:
-
-        st.error(
-            f"Erro ao conectar na planilha: {e}"
-        )
-
-        return None
+    return None
 
 
 def salvar_dados(
     codigo,
     novos_dados,
 ):
+  try:
+    service = conectar_sheets()
 
-    try:
-
-        service = conectar_sheets()
-
-        result = (
-            service.spreadsheets()
-            .values()
-            .get(
-                spreadsheetId=SPREADSHEET_ID,
-                range=f"'{NOME_ABA}'!A:Z",
-            )
-            .execute()
+    result = (
+        service.spreadsheets()
+        .values()
+        .get(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f"'{NOME_ABA}'!A:Z",
         )
+        .execute()
+    )
 
-        rows = result.get(
-            "values",
-            [],
-        )
+    rows = result.get(
+        "values",
+        [],
+    )
 
-        for i, row in enumerate(rows):
+    for i, row in enumerate(rows):
+      if row and normalizar(row[0]) == normalizar(codigo):
+        range_to_update = f"'{NOME_ABA}'!A{i + 1}:Z{i + 1}"
 
-            if (
-                row
-                and normalizar(row[0])
-                == normalizar(codigo)
-            ):
+        body = {"values": [novos_dados]}
 
-                range_to_update = (
-                    f"'{NOME_ABA}'!"
-                    f"A{i + 1}:Z{i + 1}"
-                )
+        service.spreadsheets().values().update(
+            spreadsheetId=SPREADSHEET_ID,
+            range=range_to_update,
+            valueInputOption="RAW",
+            body=body,
+        ).execute()
 
-                body = {
-                    "values": [
-                        novos_dados
-                    ]
-                }
+        return True
 
-                service.spreadsheets().values().update(
-                    spreadsheetId=SPREADSHEET_ID,
-                    range=range_to_update,
-                    valueInputOption="RAW",
-                    body=body,
-                ).execute()
+    return False
 
-                return True
+  except Exception as e:
+    st.error(f"Erro ao salvar na planilha: {e}")
 
-        return False
-
-    except Exception as e:
-
-        st.error(
-            f"Erro ao salvar na planilha: {e}"
-        )
-
-        return False
+    return False
 
 
 def obter_valor(
     dados_imovel,
     chave,
 ):
+  if not dados_imovel:
+    return ""
 
-    if not dados_imovel:
-        return ""
-
-    return str(
-        dados_imovel.get(
-            normalizar(chave),
-            "",
-        )
-    )
+  return str(
+      dados_imovel.get(
+          normalizar(chave),
+          "",
+      )
+  )
 
 
 def carregar_dados_na_interface(
     dados,
 ):
+  campos = {
+      "f_codigo": "CODIGO",
+      "f_tipo": "TIPO",
+      "f_cidade": "CIDADE",
+      "f_bairro": "BAIRRO",
+      "f_endereco": "ENDERECO",
+      "f_proprietario": "PROPRIETARIO",
+      "f_contato": "CONTATO",
+      "f_status": "STATUS",
+      "f_exclus": "EXCLUS",
+      "f_data": "DATA",
+      "f_valor": "VALOR",
+      "f_area_util": "AREA UTIL",
+      "f_area_total": "AREA TOTAL",
+      "f_andar": "ANDAR",
+      "f_iptu": "IPTU",
+      "f_dormitorios": "DORMITORIOS",
+      "f_banheiros": "BANHEIROS",
+      "f_suites": "SUITES",
+      "f_vagas": "VAGAS",
+      "f_titulo1": "TITULO 1",
+      "f_titulo2": "TITULO 2",
+      "f_titulo3": "TITULO 3",
+      "f_descricao": "DESCRICAO",
+      "f_obs": "OBS EXTRAS",
+  }
 
-    campos = {
-        "f_codigo": "CODIGO",
-        "f_tipo": "TIPO",
-        "f_cidade": "CIDADE",
-        "f_bairro": "BAIRRO",
-        "f_endereco": "ENDERECO",
-        "f_proprietario": "PROPRIETARIO",
-        "f_contato": "CONTATO",
-        "f_status": "STATUS",
-        "f_exclus": "EXCLUS",
-        "f_data": "DATA",
-        "f_valor": "VALOR",
-        "f_area_util": "AREA UTIL",
-        "f_area_total": "AREA TOTAL",
-        "f_andar": "ANDAR",
-        "f_iptu": "IPTU",
-        "f_dormitorios": "DORMITORIOS",
-        "f_banheiros": "BANHEIROS",
-        "f_suites": "SUITES",
-        "f_vagas": "VAGAS",
-        "f_titulo1": "TITULO 1",
-        "f_titulo2": "TITULO 2",
-        "f_titulo3": "TITULO 3",
-        "f_descricao": "DESCRICAO",
-        "f_obs": "OBS EXTRAS",
-    }
-
-    for campo, chave in campos.items():
-
-        st.session_state[campo] = obter_valor(
-            dados,
-            chave,
-        )
+  for campo, chave in campos.items():
+    st.session_state[campo] = obter_valor(
+        dados,
+        chave,
+    )
 
 
 # =============================================================================
 # GERADOR PDF
 # =============================================================================
 
+
 def executar_gerador_pdf(
     codigo_imovel,
 ):
+  try:
+    importlib.reload(gerador_pdf)
 
-    try:
+    pdf_bytes = gerador_pdf.gerar_pdf(codigo_imovel)
 
-        importlib.reload(
-            gerador_pdf
+    if (
+        pdf_bytes
+        and isinstance(
+            pdf_bytes,
+            (bytes, bytearray),
         )
+        and len(pdf_bytes) > 10000
+    ):
+      return True, pdf_bytes
 
-        pdf_bytes = (
-            gerador_pdf.gerar_pdf(
-                codigo_imovel
-            )
-        )
+    return False, "Falha ao gerar o PDF."
 
-        if (
-            pdf_bytes
-            and isinstance(
-                pdf_bytes,
-                (bytes, bytearray),
-            )
-            and len(pdf_bytes) > 10000
-        ):
-
-            return True, pdf_bytes
-
-        return False, (
-            "Falha ao gerar o PDF."
-        )
-
-    except Exception as e:
-
-        return False, (
-            f"Erro ao gerar PDF: {e}"
-        )
+  except Exception as e:
+    return False, f"Erro ao gerar PDF: {e}"
 
 
 # =============================================================================
 # GERADOR POSTS
 # =============================================================================
 
+
 def executar_gerador_posts(
     codigo_imovel,
 ):
+  if gerar_posts is None:
+    return False, "Modulo gerar_posts nao encontrado."
 
-    if gerar_posts is None:
+  try:
+    importlib.reload(gerar_posts)
 
-        return False, (
-            "Modulo gerar_posts nao encontrado."
-        )
+    resultado = gerar_posts.gerar_posts(codigo_imovel)
 
-    try:
+    if isinstance(resultado, (bytes, bytearray)) and len(resultado) > 1000:
+      return True, resultado
 
-        importlib.reload(
-            gerar_posts
-        )
+    if isinstance(resultado, str) and Path(resultado).exists():
+      return True, resultado
 
-        resultado = (
-            gerar_posts.gerar_posts(
-                codigo_imovel
-            )
-        )
+    return False, "Falha ao gerar os posts."
 
-        if (
-            isinstance(
-                resultado,
-                (bytes, bytearray),
-            )
-            and len(resultado) > 1000
-        ):
-
-            return True, resultado
-
-        if (
-            isinstance(
-                resultado,
-                str,
-            )
-            and Path(
-                resultado
-            ).exists()
-        ):
-
-            return True, resultado
-
-        return False, (
-            "Falha ao gerar os posts."
-        )
-
-    except Exception as e:
-
-        return False, (
-            f"Erro ao gerar posts: {e}"
-        )
+  except Exception as e:
+    return False, f"Erro ao gerar posts: {e}"
 
 
 # =============================================================================
 # TRATADOR DE FOTOS
 # =============================================================================
 
+
 def executar_tratador_fotos(
     codigo_imovel,
 ):
+  if tratador_nuvem is None:
+    return False, "Modulo tratador_nuvem nao encontrado."
 
-    if tratador_nuvem is None:
+  try:
+    importlib.reload(tratador_nuvem)
 
-        return False, (
-            "Modulo tratador_nuvem nao encontrado."
+    service_drive = conectar_drive()
+
+    if service_drive is None:
+      return False, "Não foi possível conectar ao Google Drive."
+
+    logo_bytes = None
+
+    logo_path = Path("marca/logo.png")
+
+    if logo_path.exists():
+      with open(
+          logo_path,
+          "rb",
+      ) as f:
+        logo_bytes = f.read()
+
+    with st.spinner(f"Processando fotos do imóvel {codigo_imovel}..."):
+      if hasattr(
+          tratador_nuvem,
+          "tratar",
+      ):
+        resultado = tratador_nuvem.tratar(
+            codigo_imovel,
+            service=service_drive,
+            logo_bytes=logo_bytes,
         )
 
-    try:
-
-        importlib.reload(
-            tratador_nuvem
+      elif hasattr(
+          tratador_nuvem,
+          "tratar_fotos",
+      ):
+        resultado = tratador_nuvem.tratar_fotos(
+            codigo_imovel,
+            service=service_drive,
+            logo_bytes=logo_bytes,
         )
 
-        # ---------------------------------------------------------
-        # CONEXÃO COM DRIVE
-        # ---------------------------------------------------------
+      else:
+        return False, "Função de tratamento não encontrada."
 
-        service_drive = conectar_drive()
+    if not resultado:
+      return False, "Nenhuma foto foi tratada."
 
-        if service_drive is None:
+    if isinstance(
+        resultado,
+        bytes,
+    ):
+      zip_bytes = resultado
 
-            return False, (
-                "Não foi possível conectar ao Google Drive."
-            )
+    elif isinstance(
+        resultado,
+        bytearray,
+    ):
+      zip_bytes = bytes(resultado)
 
-        # ---------------------------------------------------------
-        # LOGO
-        # ---------------------------------------------------------
+    elif hasattr(
+        resultado,
+        "getvalue",
+    ):
+      zip_bytes = resultado.getvalue()
 
-        logo_bytes = None
+    elif hasattr(
+        resultado,
+        "read",
+    ):
+      resultado.seek(0)
 
-        logo_path = Path(
-            "marca/logo.png"
-        )
+      zip_bytes = resultado.read()
 
-        if logo_path.exists():
+    else:
+      return False, "O tratamento não retornou um ZIP válido."
 
-            with open(
-                logo_path,
-                "rb",
-            ) as f:
+    if not zip_bytes:
+      return False, "O ZIP gerado está vazio."
 
-                logo_bytes = f.read()
+    return True, zip_bytes
 
-        # ---------------------------------------------------------
-        # PROCESSAMENTO
-        # ---------------------------------------------------------
-
-        with st.spinner(
-            f"Processando fotos do imóvel "
-            f"{codigo_imovel}..."
-        ):
-
-            if hasattr(
-                tratador_nuvem,
-                "tratar",
-            ):
-
-                resultado = (
-                    tratador_nuvem.tratar(
-                        codigo_imovel,
-                        service=service_drive,
-                        logo_bytes=logo_bytes,
-                    )
-                )
-
-            elif hasattr(
-                tratador_nuvem,
-                "tratar_fotos",
-            ):
-
-                resultado = (
-                    tratador_nuvem.tratar_fotos(
-                        codigo_imovel,
-                        service=service_drive,
-                        logo_bytes=logo_bytes,
-                    )
-                )
-
-            else:
-
-                return False, (
-                    "Função de tratamento não encontrada."
-                )
-
-        # ---------------------------------------------------------
-        # VALIDAÇÃO DO ZIP
-        # ---------------------------------------------------------
-
-        if not resultado:
-
-            return False, (
-                "Nenhuma foto foi tratada."
-            )
-
-        if isinstance(
-            resultado,
-            bytes,
-        ):
-
-            zip_bytes = resultado
-
-        elif isinstance(
-            resultado,
-            bytearray,
-        ):
-
-            zip_bytes = bytes(
-                resultado
-            )
-
-        elif hasattr(
-            resultado,
-            "getvalue",
-        ):
-
-            zip_bytes = resultado.getvalue()
-
-        elif hasattr(
-            resultado,
-            "read",
-        ):
-
-            resultado.seek(0)
-
-            zip_bytes = resultado.read()
-
-        else:
-
-            return False, (
-                "O tratamento não retornou um ZIP válido."
-            )
-
-        if not zip_bytes:
-
-            return False, (
-                "O ZIP gerado está vazio."
-            )
-
-        return True, zip_bytes
-
-    except Exception as e:
-
-        return False, (
-            f"Erro no tratamento: {e}"
-        )
+  except Exception as e:
+    return False, f"Erro no tratamento: {e}"
 
 
 # =============================================================================
@@ -591,166 +422,101 @@ def executar_tratador_fotos(
 # =============================================================================
 
 if "codigo_busca" not in st.session_state:
-    st.session_state[
-        "codigo_busca"
-    ] = ""
+  st.session_state["codigo_busca"] = ""
 
 if "dados_imovel" not in st.session_state:
-    st.session_state[
-        "dados_imovel"
-    ] = None
+  st.session_state["dados_imovel"] = None
 
 if "confirmar_tratamento" not in st.session_state:
-    st.session_state[
-        "confirmar_tratamento"
-    ] = False
+  st.session_state["confirmar_tratamento"] = False
 
 if "fotos_tratadas_zip" not in st.session_state:
-    st.session_state[
-        "fotos_tratadas_zip"
-    ] = None
+  st.session_state["fotos_tratadas_zip"] = None
 
 if "fotos_tratadas_nome" not in st.session_state:
-    st.session_state[
-        "fotos_tratadas_nome"
-    ] = "fotos_tratadas.zip"
+  st.session_state["fotos_tratadas_nome"] = "fotos_tratadas.zip"
 
 
 # =============================================================================
 # CABEÇALHO
 # =============================================================================
 
-st.title(
-    "Carvalho Ferreira"
-)
+st.title("Carvalho Ferreira")
 
-st.caption(
-    "Painel de gestao e geracao de materiais"
-)
+st.caption("Painel de gestao e geracao de materiais")
 
 
 # =============================================================================
 # BUSCA DO IMÓVEL
 # =============================================================================
 
-st.markdown(
-    "### Seleção de Imóvel"
-)
+st.markdown("### Seleção de Imóvel")
 
-col_busca1, col_busca2 = st.columns(
-    [3, 1]
-)
+col_busca1, col_busca2 = st.columns([3, 1])
 
 with col_busca1:
-
-    codigo_input = st.text_input(
-        "Código do Imóvel",
-        value=st.session_state[
-            "codigo_busca"
-        ],
-        placeholder="Ex: CF003",
-        label_visibility="collapsed",
-        key="campo_codigo_principal",
-    )
+  codigo_input = st.text_input(
+      "Código do Imóvel",
+      value=st.session_state["codigo_busca"],
+      placeholder="Ex: CF003",
+      label_visibility="collapsed",
+      key="campo_codigo_principal",
+  )
 
 with col_busca2:
+  buscar = st.button(
+      "Buscar",
+      use_container_width=True,
+      type="primary",
+      key="btn_buscar_principal",
+  )
 
-    buscar = st.button(
-        "Buscar",
-        use_container_width=True,
-        type="primary",
-        key="btn_buscar_principal",
-    )
+
+codigo_digitado = (codigo_input or "").strip().upper()
 
 
-codigo_digitado = (
-    codigo_input or ""
+if (buscar and codigo_digitado) or (
+    codigo_digitado and codigo_digitado != st.session_state["codigo_busca"]
+):
+  st.session_state["codigo_busca"] = codigo_digitado
+
+  if codigo_digitado:
+    with st.spinner("Buscando dados na planilha..."):
+      dados_encontrados = buscar_imovel(codigo_digitado)
+
+    if dados_encontrados is None:
+      st.session_state["dados_imovel"] = None
+
+      st.warning(f"Registro {codigo_digitado} nao localizado.")
+
+    else:
+      st.session_state["dados_imovel"] = dados_encontrados
+
+      carregar_dados_na_interface(dados_encontrados)
+
+  st.rerun()
+
+
+codigo_busca = st.session_state.get(
+    "codigo_busca",
+    "",
 ).strip().upper()
 
-
-if (
-    buscar
-    and codigo_digitado
-) or (
-    codigo_digitado
-    and codigo_digitado
-    != st.session_state[
-        "codigo_busca"
-    ]
-):
-
-    st.session_state[
-        "codigo_busca"
-    ] = codigo_digitado
-
-    if codigo_digitado:
-
-        with st.spinner(
-            "Buscando dados na planilha..."
-        ):
-
-            dados_encontrados = (
-                buscar_imovel(
-                    codigo_digitado
-                )
-            )
-
-        if dados_encontrados is None:
-
-            st.session_state[
-                "dados_imovel"
-            ] = None
-
-            st.warning(
-                f"Registro {codigo_digitado} nao localizado."
-            )
-
-        else:
-
-            st.session_state[
-                "dados_imovel"
-            ] = dados_encontrados
-
-            carregar_dados_na_interface(
-                dados_encontrados
-            )
-
-    st.rerun()
-
-
-codigo_busca = (
-    st.session_state
-    .get(
-        "codigo_busca",
-        "",
-    )
-    .strip()
-    .upper()
-)
-
-dados_imovel = (
-    st.session_state
-    .get(
-        "dados_imovel",
-        None,
-    )
+dados_imovel = st.session_state.get(
+    "dados_imovel",
+    None,
 )
 
 
 if codigo_busca and dados_imovel:
-
-    st.success(
-        f"Imóvel **{codigo_busca}** carregado com sucesso!"
-    )
+  st.success(f"Imóvel **{codigo_busca}** carregado com sucesso!")
 
 
 # =============================================================================
 # SIDEBAR
 # =============================================================================
 
-st.sidebar.markdown(
-    "### Materiais & Ações"
-)
+st.sidebar.markdown("### Materiais & Ações")
 
 
 # =============================================================================
@@ -760,19 +526,19 @@ st.sidebar.markdown(
 st.sidebar.markdown("---")
 
 if codigo_busca:
-    st.sidebar.page_link(
-        "pages/materiais.py",
-        label="📂 Materiais / Compartilhar",
-        icon="📂",
-        use_container_width=True,
-    )
+  st.sidebar.page_link(
+      "pages/materiais.py",
+      label="📂 Materiais / Compartilhar",
+      icon="📂",
+      use_container_width=True,
+  )
 else:
-    st.sidebar.button(
-        "📂 Materiais / Compartilhar",
-        use_container_width=True,
-        disabled=True,
-        help="Busque um imóvel primeiro",
-    )
+  st.sidebar.button(
+      "📂 Materiais / Compartilhar",
+      use_container_width=True,
+      disabled=True,
+      help="Busque um imóvel primeiro",
+  )
 
 
 # =============================================================================
@@ -784,65 +550,36 @@ if st.sidebar.button(
     use_container_width=True,
     key="btn_pdf",
 ):
+  if not codigo_busca:
+    st.sidebar.error("Informe o codigo.")
 
-    if not codigo_busca:
+  else:
+    with st.spinner("Gerando PDF..."):
+      ok, res = executar_gerador_pdf(codigo_busca)
 
-        st.sidebar.error(
-            "Informe o codigo."
-        )
+    if ok:
+      st.session_state["pdf_bytes"] = res
+
+      st.session_state["pdf_nome"] = f"{codigo_busca}.pdf"
+
+      st.sidebar.success("PDF gerado.")
 
     else:
-
-        with st.spinner(
-            "Gerando PDF..."
-        ):
-
-            ok, res = (
-                executar_gerador_pdf(
-                    codigo_busca
-                )
-            )
-
-        if ok:
-
-            st.session_state[
-                "pdf_bytes"
-            ] = res
-
-            st.session_state[
-                "pdf_nome"
-            ] = (
-                f"{codigo_busca}.pdf"
-            )
-
-            st.sidebar.success(
-                "PDF gerado."
-            )
-
-        else:
-
-            st.sidebar.error(
-                res
-            )
+      st.sidebar.error(res)
 
 
-if st.session_state.get(
-    "pdf_bytes"
-):
-
-    st.sidebar.download_button(
-        "Baixar PDF",
-        data=st.session_state[
-            "pdf_bytes"
-        ],
-        file_name=st.session_state.get(
-            "pdf_nome",
-            "dossie.pdf",
-        ),
-        mime="application/pdf",
-        use_container_width=True,
-        key="dl_pdf_sidebar",
-    )
+if st.session_state.get("pdf_bytes"):
+  st.sidebar.download_button(
+      "Baixar PDF",
+      data=st.session_state["pdf_bytes"],
+      file_name=st.session_state.get(
+          "pdf_nome",
+          "dossie.pdf",
+      ),
+      mime="application/pdf",
+      use_container_width=True,
+      key="dl_pdf_sidebar",
+  )
 
 
 # =============================================================================
@@ -854,92 +591,54 @@ if st.sidebar.button(
     use_container_width=True,
     key="btn_posts",
 ):
+  if not codigo_busca:
+    st.sidebar.error("Informe o codigo.")
 
-    if not codigo_busca:
+  else:
+    with st.spinner("Gerando posts..."):
+      ok, res = executar_gerador_posts(codigo_busca)
 
-        st.sidebar.error(
-            "Informe o codigo."
-        )
+    if ok:
+      st.session_state["posts_resultado"] = res
+
+      st.sidebar.success("Posts gerados.")
 
     else:
-
-        with st.spinner(
-            "Gerando posts..."
-        ):
-
-            ok, res = (
-                executar_gerador_posts(
-                    codigo_busca
-                )
-            )
-
-        if ok:
-
-            st.session_state[
-                "posts_resultado"
-            ] = res
-
-            st.sidebar.success(
-                "Posts gerados."
-            )
-
-        else:
-
-            st.sidebar.error(
-                res
-            )
+      st.sidebar.error(res)
 
 
-if (
-    st.session_state.get(
-        "posts_resultado"
-    )
-    is not None
-):
+if st.session_state.get("posts_resultado") is not None:
+  posts_res = st.session_state["posts_resultado"]
 
-    posts_res = (
-        st.session_state[
-            "posts_resultado"
-        ]
+  if isinstance(
+      posts_res,
+      (bytes, bytearray),
+  ):
+    st.sidebar.download_button(
+        "Baixar Posts (ZIP)",
+        data=posts_res,
+        file_name=f"posts_{codigo_busca}.zip",
+        mime="application/zip",
+        use_container_width=True,
+        key="dl_posts_bytes",
     )
 
-    if isinstance(
-        posts_res,
-        (bytes, bytearray),
-    ):
+  else:
+    caminho = Path(str(posts_res))
 
+    if caminho.exists():
+      with open(
+          caminho,
+          "rb",
+      ) as f:
         st.sidebar.download_button(
             "Baixar Posts (ZIP)",
-            data=posts_res,
-            file_name=(
-                f"posts_{codigo_busca}.zip"
-            ),
+            data=f.read(),
+            file_name=caminho.name,
             mime="application/zip",
             use_container_width=True,
-            key="dl_posts_bytes",
+            key="dl_posts_path",
         )
-
-    else:
-
-        caminho = Path(
-            str(posts_res)
-        )
-
-        if caminho.exists():
-
-            with open(
-                caminho,
-                "rb",
-            ) as f:
-
-                st.sidebar.download_button(
-                    "Baixar Posts (ZIP)",
-                    data=f.read(),
-                    file_name=caminho.name,
-                    mime="application/zip",
-                    use_container_width=True,
-                    key="dl_posts_path",
-                )
 
 
 # =============================================================================
@@ -951,115 +650,70 @@ if st.sidebar.button(
     use_container_width=True,
     key="btn_tratar",
 ):
+  if not codigo_busca:
+    st.sidebar.error("Informe o codigo.")
 
-    if not codigo_busca:
+  else:
+    st.session_state["confirmar_tratamento"] = True
 
-        st.sidebar.error(
-            "Informe o codigo."
+
+if st.session_state.get("confirmar_tratamento"):
+  st.sidebar.warning("O tratamento pode demorar alguns minutos.")
+
+  a1, a2 = st.sidebar.columns(2)
+
+  with a1:
+    if st.button(
+        "Sim",
+        use_container_width=True,
+        key="trat_sim",
+    ):
+      st.session_state["confirmar_tratamento"] = False
+
+      ok, resultado = executar_tratador_fotos(codigo_busca)
+
+      if ok:
+        st.session_state["fotos_tratadas_zip"] = resultado
+
+        st.session_state["fotos_tratadas_nome"] = (
+            f"{codigo_busca}_fotos_tratadas.zip"
         )
 
-    else:
+        st.sidebar.success("Fotos tratadas com sucesso.")
 
-        st.session_state[
-            "confirmar_tratamento"
-        ] = True
+      else:
+        st.session_state["fotos_tratadas_zip"] = None
 
+        st.sidebar.error(resultado)
 
-if st.session_state.get(
-    "confirmar_tratamento"
-):
-
-    st.sidebar.warning(
-        "O tratamento pode demorar alguns minutos."
-    )
-
-    a1, a2 = st.sidebar.columns(
-        2
-    )
-
-    with a1:
-
-        if st.button(
-            "Sim",
-            use_container_width=True,
-            key="trat_sim",
-        ):
-
-            st.session_state[
-                "confirmar_tratamento"
-            ] = False
-
-            ok, resultado = (
-                executar_tratador_fotos(
-                    codigo_busca
-                )
-            )
-
-            if ok:
-
-                st.session_state[
-                    "fotos_tratadas_zip"
-                ] = resultado
-
-                st.session_state[
-                    "fotos_tratadas_nome"
-                ] = (
-                    f"{codigo_busca}_fotos_tratadas.zip"
-                )
-
-                st.sidebar.success(
-                    "Fotos tratadas com sucesso."
-                )
-
-            else:
-
-                st.session_state[
-                    "fotos_tratadas_zip"
-                ] = None
-
-                st.sidebar.error(
-                    resultado
-                )
-
-    with a2:
-
-        if st.button(
-            "Nao",
-            use_container_width=True,
-            key="trat_nao",
-        ):
-
-            st.session_state[
-                "confirmar_tratamento"
-            ] = False
+  with a2:
+    if st.button(
+        "Nao",
+        use_container_width=True,
+        key="trat_nao",
+    ):
+      st.session_state["confirmar_tratamento"] = False
 
 
 # =============================================================================
 # DOWNLOAD DAS FOTOS TRATADAS
 # =============================================================================
 
-if st.session_state.get(
-    "fotos_tratadas_zip"
-):
+if st.session_state.get("fotos_tratadas_zip"):
+  st.sidebar.markdown("### Fotos tratadas")
 
-    st.sidebar.markdown(
-        "### Fotos tratadas"
-    )
-
-    st.sidebar.download_button(
-        "Baixar Fotos Tratadas",
-        data=st.session_state[
-            "fotos_tratadas_zip"
-        ],
-        file_name=st.session_state.get(
-            "fotos_tratadas_nome",
-            f"{codigo_busca}_fotos_tratadas.zip",
-        ),
-        mime="application/zip",
-        use_container_width=True,
-        type="primary",
-        key="dl_fotos_tratadas",
-    )
+  st.sidebar.download_button(
+      "Baixar Fotos Tratadas",
+      data=st.session_state["fotos_tratadas_zip"],
+      file_name=st.session_state.get(
+          "fotos_tratadas_nome",
+          f"{codigo_busca}_fotos_tratadas.zip",
+      ),
+      mime="application/zip",
+      use_container_width=True,
+      type="primary",
+      key="dl_fotos_tratadas",
+  )
 
 
 # =============================================================================
@@ -1080,64 +734,59 @@ tab1, tab2, tab3 = st.tabs(
 # =============================================================================
 
 with tab1:
+  col_a, col_b = st.columns(2)
 
-    col_a, col_b = st.columns(
-        2
+  with col_a:
+    novo_codigo = st.text_input(
+        "Codigo",
+        key="f_codigo",
     )
 
-    with col_a:
+    novo_tipo = st.text_input(
+        "Tipo",
+        key="f_tipo",
+    )
 
-        novo_codigo = st.text_input(
-            "Codigo",
-            key="f_codigo",
-        )
+    novo_cidade = st.text_input(
+        "Cidade",
+        key="f_cidade",
+    )
 
-        novo_tipo = st.text_input(
-            "Tipo",
-            key="f_tipo",
-        )
+    novo_bairro = st.text_input(
+        "Bairro",
+        key="f_bairro",
+    )
 
-        novo_cidade = st.text_input(
-            "Cidade",
-            key="f_cidade",
-        )
+    novo_endereco = st.text_input(
+        "Endereco",
+        key="f_endereco",
+    )
 
-        novo_bairro = st.text_input(
-            "Bairro",
-            key="f_bairro",
-        )
+  with col_b:
+    novo_proprietario = st.text_input(
+        "Proprietario",
+        key="f_proprietario",
+    )
 
-        novo_endereco = st.text_input(
-            "Endereco",
-            key="f_endereco",
-        )
+    novo_contato = st.text_input(
+        "Contato",
+        key="f_contato",
+    )
 
-    with col_b:
+    novo_status = st.text_input(
+        "Status",
+        key="f_status",
+    )
 
-        novo_proprietario = st.text_input(
-            "Proprietario",
-            key="f_proprietario",
-        )
+    novo_exclus = st.text_input(
+        "Exclusividade",
+        key="f_exclus",
+    )
 
-        novo_contato = st.text_input(
-            "Contato",
-            key="f_contato",
-        )
-
-        novo_status = st.text_input(
-            "Status",
-            key="f_status",
-        )
-
-        novo_exclus = st.text_input(
-            "Exclusividade",
-            key="f_exclus",
-        )
-
-        novo_data = st.text_input(
-            "Data",
-            key="f_data",
-        )
+    novo_data = st.text_input(
+        "Data",
+        key="f_data",
+    )
 
 
 # =============================================================================
@@ -1145,59 +794,54 @@ with tab1:
 # =============================================================================
 
 with tab2:
+  col_d, col_e = st.columns(2)
 
-    col_d, col_e = st.columns(
-        2
+  with col_d:
+    novo_valor = st.text_input(
+        "Valor",
+        key="f_valor",
     )
 
-    with col_d:
+    novo_area_util = st.text_input(
+        "Area Util",
+        key="f_area_util",
+    )
 
-        novo_valor = st.text_input(
-            "Valor",
-            key="f_valor",
-        )
+    novo_area_total = st.text_input(
+        "Area Total",
+        key="f_area_total",
+    )
 
-        novo_area_util = st.text_input(
-            "Area Util",
-            key="f_area_util",
-        )
+    novo_andar = st.text_input(
+        "Andar",
+        key="f_andar",
+    )
 
-        novo_area_total = st.text_input(
-            "Area Total",
-            key="f_area_total",
-        )
+    novo_iptu = st.text_input(
+        "IPTU",
+        key="f_iptu",
+    )
 
-        novo_andar = st.text_input(
-            "Andar",
-            key="f_andar",
-        )
+  with col_e:
+    novo_dormitorios = st.text_input(
+        "Dormitorios",
+        key="f_dormitorios",
+    )
 
-        novo_iptu = st.text_input(
-            "IPTU",
-            key="f_iptu",
-        )
+    novo_banheiros = st.text_input(
+        "Banheiros",
+        key="f_banheiros",
+    )
 
-    with col_e:
+    novo_suites = st.text_input(
+        "Suites",
+        key="f_suites",
+    )
 
-        novo_dormitorios = st.text_input(
-            "Dormitorios",
-            key="f_dormitorios",
-        )
-
-        novo_banheiros = st.text_input(
-            "Banheiros",
-            key="f_banheiros",
-        )
-
-        novo_suites = st.text_input(
-            "Suites",
-            key="f_suites",
-        )
-
-        novo_vagas = st.text_input(
-            "Vagas",
-            key="f_vagas",
-        )
+    novo_vagas = st.text_input(
+        "Vagas",
+        key="f_vagas",
+    )
 
 
 # =============================================================================
@@ -1205,33 +849,32 @@ with tab2:
 # =============================================================================
 
 with tab3:
+  novo_titulo_1 = st.text_input(
+      "Titulo 1",
+      key="f_titulo1",
+  )
 
-    novo_titulo_1 = st.text_input(
-        "Titulo 1",
-        key="f_titulo1",
-    )
+  novo_titulo_2 = st.text_input(
+      "Titulo 2",
+      key="f_titulo2",
+  )
 
-    novo_titulo_2 = st.text_input(
-        "Titulo 2",
-        key="f_titulo2",
-    )
+  novo_titulo_3 = st.text_input(
+      "Titulo 3",
+      key="f_titulo3",
+  )
 
-    novo_titulo_3 = st.text_input(
-        "Titulo 3",
-        key="f_titulo3",
-    )
+  novo_descricao = st.text_area(
+      "Descricao",
+      height=150,
+      key="f_descricao",
+  )
 
-    novo_descricao = st.text_area(
-        "Descricao",
-        height=150,
-        key="f_descricao",
-    )
-
-    novo_obs_extras = st.text_area(
-        "Obs Extras",
-        height=100,
-        key="f_obs",
-    )
+  novo_obs_extras = st.text_area(
+      "Obs Extras",
+      height=100,
+      key="f_obs",
+  )
 
 
 # =============================================================================
@@ -1262,65 +905,45 @@ if st.button(
     use_container_width=True,
     key="btn_salvar",
 ):
+  if not codigo_busca:
+    st.warning("Busque um imovel primeiro.")
 
-    if not codigo_busca:
+  else:
+    dados_para_salvar = [
+        novo_codigo,
+        novo_tipo,
+        novo_cidade,
+        novo_bairro,
+        novo_endereco,
+        novo_proprietario,
+        novo_contato,
+        novo_valor,
+        novo_status,
+        novo_exclus,
+        novo_data,
+        novo_link,
+        novo_foto,
+        novo_dormitorios,
+        novo_banheiros,
+        novo_suites,
+        novo_vagas,
+        novo_area_util,
+        novo_area_total,
+        novo_andar,
+        novo_iptu,
+        novo_titulo_1,
+        novo_titulo_2,
+        novo_titulo_3,
+        novo_descricao,
+        novo_obs_extras,
+    ]
 
-        st.warning(
-            "Busque um imovel primeiro."
-        )
+    with st.spinner("Salvando..."):
+      if salvar_dados(
+          codigo_busca,
+          dados_para_salvar,
+      ):
+        st.success("Dados atualizados.")
 
-    else:
-
-        dados_para_salvar = [
-
-            novo_codigo,
-            novo_tipo,
-            novo_cidade,
-            novo_bairro,
-            novo_endereco,
-
-            novo_proprietario,
-            novo_contato,
-            novo_valor,
-            novo_status,
-            novo_exclus,
-            novo_data,
-
-            novo_link,
-            novo_foto,
-
-            novo_dormitorios,
-            novo_banheiros,
-            novo_suites,
-            novo_vagas,
-
-            novo_area_util,
-            novo_area_total,
-            novo_andar,
-            novo_iptu,
-
-            novo_titulo_1,
-            novo_titulo_2,
-            novo_titulo_3,
-            novo_descricao,
-            novo_obs_extras,
-        ]
-
-        with st.spinner(
-            "Salvando..."
-        ):
-
-            if salvar_dados(
-                codigo_busca,
-                dados_para_salvar,
-            ):
-
-                st.success(
-                    "Dados atualizados."
-                )
-
-            else:
-
-                st.error(
-                    "Nao foi possivel salvar."
-                )
+      else:
+        st.error("Nao foi possivel salvar.")
