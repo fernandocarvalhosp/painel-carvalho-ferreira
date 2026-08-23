@@ -58,7 +58,6 @@ st.markdown(
         color: #f7f5ef !important;
         margin-bottom: 1rem;
     }
-
     
     /* Demais Títulos visíveis e elegantes */
     h2, h3 {
@@ -251,13 +250,6 @@ def encontrar_pasta(subpastas, nome):
     return None
 
 
-def arquivos_da_pasta(subpastas, nome):
-    pasta = encontrar_pasta(subpastas, nome)
-    if not pasta:
-        return []
-    return listar_arquivos(pasta["id"])
-
-
 # =============================================================================
 # VALIDAÇÃO DA SESSÃO
 # =============================================================================
@@ -280,7 +272,6 @@ with col_voltar:
     if st.button("← Voltar"):
         st.switch_page("app.py")
 
-# Exibição limpa do código com alta visibilidade
 st.markdown(f'<div class="codigo-imovel">🏷️ IMÓVEL: {codigo}</div>', unsafe_allow_html=True)
 st.title("Central de Materiais")
 
@@ -362,60 +353,39 @@ elif selecao == "LEGENDA_2":
     else:
         st.info("Nenhuma Legenda 02 cadastrada na planilha.")
 
-
 # --- STATUS ---
 elif selecao == "STATUS":
     st.markdown("### 📱 Materiais para Status")
-    arquivos_status = arquivos_da_pasta(subpastas, "STATUS")
-    if not arquivos_status:
-        st.info("Nenhum material de Status encontrado.")
+    pasta_status = encontrar_pasta(subpastas, "STATUS")
+    st.info("⚡ Clique no botão abaixo para acessar os materiais de status no Google Drive.")
+    if pasta_status and pasta_status.get("webViewLink"):
+        st.link_button(
+            "↗ Abrir Pasta de Status no Google Drive",
+            url=pasta_status["webViewLink"],
+            use_container_width=True,
+        )
     else:
-        colunas = st.columns(2)
-        for indice, arquivo in enumerate(arquivos_status):
-            with colunas[indice % 2]:
-                st.markdown(f"**{arquivo['name']}**")
-                dados = baixar_arquivo(arquivo["id"])
-                if dados:
-                    st.image(dados, use_container_width=True)
-                    st.download_button(
-                        "📥 Baixar / Compartilhar",
-                        data=dados,
-                        file_name=arquivo["name"],
-                        key=f"dl_status_{arquivo['id']}",
-                        use_container_width=True,
-                    )
+        st.warning("Pasta de Status não encontrada no Drive deste imóvel.")
 
 # --- POSTS ---
 elif selecao == "POSTS":
     st.markdown("### 📲 Materiais para Posts")
-    arquivos_posts = arquivos_da_pasta(subpastas, "POSTS")
-    if not arquivos_posts:
-        st.info("Nenhum post encontrado.")
+    pasta_posts = encontrar_pasta(subpastas, "POSTS")
+    st.info("⚡ Clique no botão abaixo para acessar os posts no Google Drive.")
+    if pasta_posts and pasta_posts.get("webViewLink"):
+        st.link_button(
+            "↗ Abrir Pasta de Posts no Google Drive",
+            url=pasta_posts["webViewLink"],
+            use_container_width=True,
+        )
     else:
-        colunas = st.columns(2)
-        for indice, arquivo in enumerate(arquivos_posts):
-            with colunas[indice % 2]:
-                st.markdown(f"**{arquivo['name']}**")
-                dados = baixar_arquivo(arquivo["id"])
-                if dados:
-                    st.image(dados, use_container_width=True)
-                    st.download_button(
-                        "📥 Baixar / Compartilhar",
-                        data=dados,
-                        file_name=arquivo["name"],
-                        key=f"dl_post_{arquivo['id']}",
-                        use_container_width=True,
-                    )
+        st.warning("Pasta de Posts não encontrada no Drive deste imóvel.")
 
-# --- FOTOS TRATADAS (Otimizado para abrir direto no Drive) ---
+# --- FOTOS TRATADAS ---
 elif selecao == "FOTOS":
     st.markdown("### 📸 Fotos Tratadas")
     pasta_fotos = encontrar_pasta(subpastas, "FOTOS TRATADAS")
-    
-    st.info(
-        "⚡ **Clique no Botão abaixo:** Para acessar as fotos do Imóvel. "
-    )
-    
+    st.info("⚡ Clique no botão abaixo para acessar as fotos do imóvel no Google Drive.")
     if pasta_fotos and pasta_fotos.get("webViewLink"):
         st.link_button(
             "↗ Abrir Pasta de Fotos no Google Drive",
@@ -428,7 +398,11 @@ elif selecao == "FOTOS":
 # --- PDF ---
 elif selecao == "PDF":
     st.markdown("### 📄 Apresentação em PDF")
-    arquivos_pdf = arquivos_da_pasta(subpastas, "PDF")
+    arquivos_pdf = []
+    pasta_pdf = encontrar_pasta(subpastas, "PDF")
+    if pasta_pdf:
+        arquivos_pdf = listar_arquivos(pasta_pdf["id"])
+        
     if not arquivos_pdf:
         st.info("Nenhum PDF encontrado.")
     else:
@@ -458,25 +432,15 @@ elif selecao == "PDF":
 elif selecao == "VIDEOS":
     st.markdown("### 🎥 Vídeos do Imóvel")
     pasta_videos = encontrar_pasta(subpastas, "VIDEOS")
-    arquivos_videos = arquivos_da_pasta(subpastas, "VIDEOS")
-    
-    if not arquivos_videos and pasta_videos and pasta_videos.get("webViewLink"):
+    st.info("⚡ Clique no botão abaixo para acessar os vídeos do imóvel no Google Drive.")
+    if pasta_videos and pasta_videos.get("webViewLink"):
         st.link_button(
             "↗ Abrir Pasta de Vídeos no Google Drive",
             url=pasta_videos["webViewLink"],
             use_container_width=True,
         )
-    elif not arquivos_videos:
-        st.info("Nenhum vídeo encontrado.")
     else:
-        for arquivo in arquivos_videos:
-            st.markdown(f"**{arquivo['name']}**")
-            if arquivo.get("webViewLink"):
-                st.link_button(
-                    "↗ Assistir / Abrir Vídeo",
-                    url=arquivo["webViewLink"],
-                    use_container_width=True,
-                )
+        st.warning("Pasta de Vídeos não encontrada no Drive deste imóvel.")
 
 
 # =============================================================================
