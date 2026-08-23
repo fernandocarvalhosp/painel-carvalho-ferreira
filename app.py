@@ -29,7 +29,7 @@ NOME_ABA = "Imoveis"
 
 
 # =============================================================================
-# ESTILO VISUAL SOFISTICADO (DARK & PREMIUM)
+# ESTILO VISUAL SOFISTICADO (DARK & PREMIUM) + ALINHAMENTO DE CARDS
 # =============================================================================
 
 st.markdown(
@@ -75,6 +75,30 @@ st.markdown(
     }
     .imovel-card:hover {
         border-color: #d4af37;
+    }
+
+    /* Padronização visual e tamanho fixo para todas as miniaturas dos cards */
+    .imovel-card img {
+        width: 100% !important;
+        height: 200px !important;
+        object-fit: cover !important;
+        border-radius: 8px !important;
+        margin-bottom: 8px !important;
+    }
+
+    /* Caixa reservada para quando o imóvel estiver sem foto, mantendo o alinhamento */
+    .sem-foto-placeholder {
+        width: 100%;
+        height: 200px;
+        background-color: #1f2937;
+        border: 2px dashed #374151;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #8b949e;
+        font-size: 0.9rem;
+        margin-bottom: 8px;
     }
 
     /* Código em destaque */
@@ -354,7 +378,10 @@ else:
                 if foto_bytes:
                     st.image(foto_bytes, use_container_width=True)
                 else:
-                    st.markdown("🖼️ *Miniatura não configurada*")
+                    st.markdown(
+                        '<div class="sem-foto-placeholder">🖼️ Sem foto</div>', 
+                        unsafe_allow_html=True
+                    )
                 
                 st.markdown(f'<div class="codigo-tag">🏷️ {imovel["codigo"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="info-sub">{imovel["bairro"]} • {imovel["cidade"]}</div>', unsafe_allow_html=True)
