@@ -1,179 +1,160 @@
-# pages/materiais.py
+import streamlit as st
+
+
+def verificar_senha():
+    # Verifica se a senha já foi digitada corretamente nesta sessão
+    if "senha_correta" not in st.session_state:
+        st.session_state["senha_correta"] = False
+
+    if st.session_state["senha_correta"]:
+        return True
+
+    # Tela de Login simples na interface
+    st.subheader("🔒 Acesso Restrito - Painel Carvalho Ferreira")
+    senha_digitada = st.text_input(
+        "Digite a senha de acesso:",
+        type="password",
+    )
+
+    if st.button("Entrar"):
+        # Compara com a senha salva nos segredos da nuvem
+        if senha_digitada == st.secrets["passwords"]["senha_acesso"]:
+            st.session_state["senha_correta"] = True
+            st.rerun()
+        else:
+            st.error("Senha incorreta. Tente novamente.")
+
+    return False
+
+
+# Trava principal
+if not verificar_senha():
+    st.stop()
+
+
 # -*- coding: utf-8 -*-
 
-import io
-import streamlit as st
+import importlib
+from pathlib import Path
+
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
+
+import gerador_pdf
+
+try:
+    import gerar_posts
+except Exception:
+    gerar_posts = None
+
+try:
+    import tratador_nuvem
+except Exception:
+    tratador_nuvem = None
+
+
+st.set_page_config(
+    page_title="Carvalho Ferreira | Painel",
+    layout="wide",
+)
 
 
 # =============================================================================
 # CONFIGURAÇÕES
 # =============================================================================
 
-st.set_page_config(
-    page_title="Materiais | Carvalho Ferreira",
-    page_icon="CF",
-    layout="wide",
-    initial_sidebar_state="collapsed",
+SCOPES_SHEETS = [
+    "https://www.googleapis.com/auth/spreadsheets"
+]
+
+SPREADSHEET_ID = (
+    "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
 )
+
+NOME_ABA = "Imoveis"
+
 
 SCOPES_DRIVE = [
     "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/spreadsheets.readonly",
 ]
 
-SCOPES_SHEETS = [
-    "https://www.googleapis.com/auth/spreadsheets.readonly",
-]
 
-SPREADSHEET_ID = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
-NOME_ABA = "Imoveis"
+# =============================================================================
+# CONEXÃO COM GOOGLE SHEETS
+# =============================================================================
 
-PASTAS_MATERIAIS = [
-    "POSTS",
-    "FOTOS SELECIONADAS",
-    "FOTOS TRATADAS",
-    "PDF",
-    "STATUS",
-    "VIDEOS",
-]
+@st.cache_resource
+def conectar_sheets():
+
+    creds_dict = dict(
+        st.secrets["google_credentials"]
+    )
+
+    creds = (
+        service_account
+        .Credentials
+        .from_service_account_info(
+            creds_dict,
+            scopes=SCOPES_SHEETS,
+        )
+    )
+
+    return build(
+        "sheets",
+        "v4",
+        credentials=creds,
+    )
 
 
 # =============================================================================
-# ESTILO
-# =============================================================================
-
-st.markdown(
-    """
-    <style>
-
-    /* Fundo */
-    .stApp {
-        background-color: #f7f5ef;
-    }
-
-    /* Remove excesso do topo */
-    .block-container {
-        padding-top: 2rem;
-        padding-bottom: 4rem;
-        max-width: 1200px;
-    }
-
-    /* Títulos */
-    h1, h2, h3 {
-        color: #0b1b33;
-    }
-
-    /* Cartões */
-    .material-card {
-        background: #ffffff;
-        border: 1px solid #e5e1d8;
-        border-radius: 14px;
-        padding: 22px;
-        margin-bottom: 18px;
-    }
-
-    .material-title {
-        color: #0b1b33;
-        font-size: 1.15rem;
-        font-weight: 700;
-        margin-bottom: 4px;
-    }
-
-    .material-description {
-        color: #666666;
-        font-size: 0.9rem;
-        margin-bottom: 16px;
-    }
-
-    .property-code {
-        color: #9a7a38;
-        font-size: 0.8rem;
-        font-weight: 700;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-    }
-
-    .property-title {
-        color: #0b1b33;
-        font-size: 2rem;
-        font-weight: 700;
-        margin: 4px 0 0 0;
-    }
-
-    .property-price {
-        color: #0b1b33;
-        font-size: 1.3rem;
-        font-weight: 600;
-        margin-top: 4px;
-    }
-
-    .quick-action {
-        background: #0b1b33;
-        color: white;
-        border-radius: 12px;
-        padding: 16px;
-        text-align: center;
-        font-weight: 600;
-    }
-
-    /* Botões */
-    .stButton > button,
-    .stDownloadButton > button {
-        border-radius: 9px;
-        font-weight: 600;
-    }
-
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-
-# =============================================================================
-# CONEXÕES
+# CONEXÃO COM GOOGLE DRIVE
 # =============================================================================
 
 @st.cache_resource
 def conectar_drive():
-    creds_dict = dict(st.secrets["google_credentials"])
 
-    creds = service_account.Credentials.from_service_account_info(
-        creds_dict,
-        scopes=SCOPES_DRIVE,
+    creds_dict = dict(
+        st.secrets["google_credentials"]
     )
 
-    return build("drive", "v3", credentials=creds)
-
-
-@st.cache_resource
-def conectar_sheets():
-    creds_dict = dict(st.secrets["google_credentials"])
-
-    creds = service_account.Credentials.from_service_account_info(
-        creds_dict,
-        scopes=SCOPES_SHEETS,
+    creds = (
+        service_account
+        .Credentials
+        .from_service_account_info(
+            creds_dict,
+            scopes=SCOPES_DRIVE,
+        )
     )
 
-    return build("sheets", "v4", credentials=creds)
+    return build(
+        "drive",
+        "v3",
+        credentials=creds,
+    )
 
 
 # =============================================================================
-# AUXILIARES
+# PLANILHA
 # =============================================================================
 
 def normalizar(texto):
+
     if not texto:
         return ""
 
-    return " ".join(str(texto).strip().upper().split())
+    return " ".join(
+        str(texto)
+        .strip()
+        .upper()
+        .split()
+    )
 
 
-@st.cache_data(ttl=300)
-def buscar_legendas(codigo):
+def buscar_imovel(codigo):
+
     try:
+
         service = conectar_sheets()
 
         result = (
@@ -181,18 +162,27 @@ def buscar_legendas(codigo):
             .values()
             .get(
                 spreadsheetId=SPREADSHEET_ID,
-                range=f"'{NOME_ABA}'!A:AZ",
+                range=f"'{NOME_ABA}'!A:Z",
             )
             .execute()
         )
 
-        rows = result.get("values", [])
+        rows = result.get(
+            "values",
+            [],
+        )
 
         if not rows:
-            return "", ""
+            return None
 
-        cabecalho = [normalizar(h) for h in rows[0]]
-        codigo_busca = normalizar(codigo)
+        cabecalho = [
+            normalizar(h)
+            for h in rows[0]
+        ]
+
+        codigo_busca = normalizar(
+            codigo
+        )
 
         for row in rows[1:]:
 
@@ -204,710 +194,796 @@ def buscar_legendas(codigo):
 
             if normalizar(row[0]) == codigo_busca:
 
-                dados = {
+                return {
                     cabecalho[i]: row[i]
-                    for i in range(len(cabecalho))
+                    for i in range(
+                        len(cabecalho)
+                    )
                 }
 
-                legenda1 = (
-                    dados.get("LEGENDA 1", "")
-                    or dados.get("LEGENDA1", "")
-                )
-
-                legenda2 = (
-                    dados.get("LEGENDA 2", "")
-                    or dados.get("LEGENDA2", "")
-                )
-
-                return legenda1, legenda2
-
-        return "", ""
-
-    except Exception as e:
-        st.error(f"Erro ao buscar legendas: {e}")
-        return "", ""
-
-
-@st.cache_data(ttl=300)
-def encontrar_pasta_imovel(codigo):
-    service = conectar_drive()
-
-    query = (
-        f"name = '{codigo}' "
-        f"and mimeType = 'application/vnd.google-apps.folder' "
-        f"and trashed = false"
-    )
-
-    resultados = (
-        service.files()
-        .list(
-            q=query,
-            spaces="drive",
-            fields="files(id,name)",
-            pageSize=10,
-        )
-        .execute()
-    )
-
-    pastas = resultados.get("files", [])
-
-    if pastas:
-        return pastas[0]["id"]
-
-    return None
-
-
-@st.cache_data(ttl=300)
-def listar_subpastas(pasta_pai_id):
-
-    service = conectar_drive()
-
-    query = (
-        f"'{pasta_pai_id}' in parents "
-        f"and mimeType = 'application/vnd.google-apps.folder' "
-        f"and trashed = false"
-    )
-
-    resultados = (
-        service.files()
-        .list(
-            q=query,
-            spaces="drive",
-            fields="files(id,name)",
-            pageSize=50,
-        )
-        .execute()
-    )
-
-    return resultados.get("files", [])
-
-
-@st.cache_data(ttl=300)
-def listar_arquivos(pasta_id):
-
-    service = conectar_drive()
-
-    query = (
-        f"'{pasta_id}' in parents "
-        f"and mimeType != 'application/vnd.google-apps.folder' "
-        f"and trashed = false"
-    )
-
-    resultados = (
-        service.files()
-        .list(
-            q=query,
-            spaces="drive",
-            fields="files(id,name,mimeType,webViewLink)",
-            pageSize=100,
-            orderBy="name",
-        )
-        .execute()
-    )
-
-    return resultados.get("files", [])
-
-
-def baixar_arquivo(file_id):
-
-    service = conectar_drive()
-
-    try:
-
-        request = service.files().get_media(
-            fileId=file_id
-        )
-
-        fh = io.BytesIO()
-
-        downloader = MediaIoBaseDownload(
-            fh,
-            request
-        )
-
-        done = False
-
-        while not done:
-
-            status, done = downloader.next_chunk()
-
-        fh.seek(0)
-
-        return fh.read()
+        return None
 
     except Exception as e:
 
-        st.error(f"Erro ao carregar arquivo: {e}")
+        st.error(
+            f"Erro ao conectar na planilha: {e}"
+        )
 
         return None
 
 
-def encontrar_pasta(subpastas, nome):
+def salvar_dados(
+    codigo,
+    novos_dados,
+):
 
-    nome_normalizado = normalizar(nome)
+    try:
 
-    for pasta in subpastas:
+        service = conectar_sheets()
 
-        if normalizar(pasta["name"]) == nome_normalizado:
+        result = (
+            service.spreadsheets()
+            .values()
+            .get(
+                spreadsheetId=SPREADSHEET_ID,
+                range=f"'{NOME_ABA}'!A:Z",
+            )
+            .execute()
+        )
 
-            return pasta
+        rows = result.get(
+            "values",
+            [],
+        )
 
-    return None
+        for i, row in enumerate(rows):
+
+            if (
+                row
+                and normalizar(row[0])
+                == normalizar(codigo)
+            ):
+
+                range_to_update = (
+                    f"'{NOME_ABA}'!"
+                    f"A{i + 1}:Z{i + 1}"
+                )
+
+                body = {
+                    "values": [
+                        novos_dados
+                    ]
+                }
+
+                service.spreadsheets().values().update(
+                    spreadsheetId=SPREADSHEET_ID,
+                    range=range_to_update,
+                    valueInputOption="RAW",
+                    body=body,
+                ).execute()
+
+                return True
+
+        return False
+
+    except Exception as e:
+
+        st.error(
+            f"Erro ao salvar na planilha: {e}"
+        )
+
+        return False
 
 
-def arquivos_da_pasta(subpastas, nome):
+def obter_valor(
+    dados_imovel,
+    chave,
+):
 
-    pasta = encontrar_pasta(subpastas, nome)
+    if not dados_imovel:
+        return ""
 
-    if not pasta:
-        return []
-
-    return listar_arquivos(pasta["id"])
-
-
-def arquivo_e_imagem(arquivo):
-
-    mime = arquivo.get("mimeType", "")
-
-    return mime.startswith("image/")
-
-
-def arquivo_e_pdf(arquivo):
-
-    return arquivo.get("mimeType") == "application/pdf"
-
-
-# =============================================================================
-# IMÓVEL SELECIONADO
-# =============================================================================
-
-codigo = (
-    st.session_state.get("codigo_materiais")
-    or st.session_state.get("codigo_busca", "")
-)
-
-if not codigo:
-
-    st.warning(
-        "Nenhum imóvel selecionado. "
-        "Volte para o painel e escolha um imóvel."
+    return str(
+        dados_imovel.get(
+            normalizar(chave),
+            "",
+        )
     )
 
-    if st.button("← Voltar para o painel"):
 
-        st.switch_page("app.py")
+def carregar_dados_na_interface(
+    dados,
+):
 
-    st.stop()
+    campos = {
+        "f_codigo": "CODIGO",
+        "f_tipo": "TIPO",
+        "f_cidade": "CIDADE",
+        "f_bairro": "BAIRRO",
+        "f_endereco": "ENDERECO",
+        "f_proprietario": "PROPRIETARIO",
+        "f_contato": "CONTATO",
+        "f_status": "STATUS",
+        "f_exclus": "EXCLUS",
+        "f_data": "DATA",
+        "f_valor": "VALOR",
+        "f_area_util": "AREA UTIL",
+        "f_area_total": "AREA TOTAL",
+        "f_andar": "ANDAR",
+        "f_iptu": "IPTU",
+        "f_dormitorios": "DORMITORIOS",
+        "f_banheiros": "BANHEIROS",
+        "f_suites": "SUITES",
+        "f_vagas": "VAGAS",
+        "f_titulo1": "TITULO 1",
+        "f_titulo2": "TITULO 2",
+        "f_titulo3": "TITULO 3",
+        "f_descricao": "DESCRICAO",
+        "f_obs": "OBS EXTRAS",
+    }
+
+    for campo, chave in campos.items():
+
+        st.session_state[campo] = obter_valor(
+            dados,
+            chave,
+        )
+
+
+# =============================================================================
+# GERADOR PDF
+# =============================================================================
+
+def executar_gerador_pdf(
+    codigo_imovel,
+):
+
+    try:
+
+        importlib.reload(
+            gerador_pdf
+        )
+
+        pdf_bytes = (
+            gerador_pdf.gerar_pdf(
+                codigo_imovel
+            )
+        )
+
+        if (
+            pdf_bytes
+            and isinstance(
+                pdf_bytes,
+                (bytes, bytearray),
+            )
+            and len(pdf_bytes) > 10000
+        ):
+
+            return True, pdf_bytes
+
+        return False, (
+            "Falha ao gerar o PDF."
+        )
+
+    except Exception as e:
+
+        return False, (
+            f"Erro ao gerar PDF: {e}"
+        )
+
+
+# =============================================================================
+# GERADOR POSTS
+# =============================================================================
+
+def executar_gerador_posts(
+    codigo_imovel,
+):
+
+    if gerar_posts is None:
+
+        return False, (
+            "Modulo gerar_posts nao encontrado."
+        )
+
+    try:
+
+        importlib.reload(
+            gerar_posts
+        )
+
+        resultado = (
+            gerar_posts.gerar_posts(
+                codigo_imovel
+            )
+        )
+
+        if (
+            isinstance(
+                resultado,
+                (bytes, bytearray),
+            )
+            and len(resultado) > 1000
+        ):
+
+            return True, resultado
+
+        if (
+            isinstance(
+                resultado,
+                str,
+            )
+            and Path(
+                resultado
+            ).exists()
+        ):
+
+            return True, resultado
+
+        return False, (
+            "Falha ao gerar os posts."
+        )
+
+    except Exception as e:
+
+        return False, (
+            f"Erro ao gerar posts: {e}"
+        )
+
+
+# =============================================================================
+# TRATADOR DE FOTOS
+# =============================================================================
+
+def executar_tratador_fotos(
+    codigo_imovel,
+):
+
+    if tratador_nuvem is None:
+
+        return False, (
+            "Modulo tratador_nuvem nao encontrado."
+        )
+
+    try:
+
+        importlib.reload(
+            tratador_nuvem
+        )
+
+        # ---------------------------------------------------------
+        # CONEXÃO COM DRIVE
+        # ---------------------------------------------------------
+
+        service_drive = conectar_drive()
+
+        if service_drive is None:
+
+            return False, (
+                "Não foi possível conectar ao Google Drive."
+            )
+
+        # ---------------------------------------------------------
+        # LOGO
+        # ---------------------------------------------------------
+
+        logo_bytes = None
+
+        logo_path = Path(
+            "marca/logo.png"
+        )
+
+        if logo_path.exists():
+
+            with open(
+                logo_path,
+                "rb",
+            ) as f:
+
+                logo_bytes = f.read()
+
+        # ---------------------------------------------------------
+        # PROCESSAMENTO
+        # ---------------------------------------------------------
+
+        with st.spinner(
+            f"Processando fotos do imóvel "
+            f"{codigo_imovel}..."
+        ):
+
+            if hasattr(
+                tratador_nuvem,
+                "tratar",
+            ):
+
+                resultado = (
+                    tratador_nuvem.tratar(
+                        codigo_imovel,
+                        service=service_drive,
+                        logo_bytes=logo_bytes,
+                    )
+                )
+
+            elif hasattr(
+                tratador_nuvem,
+                "tratar_fotos",
+            ):
+
+                resultado = (
+                    tratador_nuvem.tratar_fotos(
+                        codigo_imovel,
+                        service=service_drive,
+                        logo_bytes=logo_bytes,
+                    )
+                )
+
+            else:
+
+                return False, (
+                    "Função de tratamento não encontrada."
+                )
+
+        # ---------------------------------------------------------
+        # VALIDAÇÃO DO ZIP
+        # ---------------------------------------------------------
+
+        if not resultado:
+
+            return False, (
+                "Nenhuma foto foi tratada."
+            )
+
+        if isinstance(
+            resultado,
+            bytes,
+        ):
+
+            zip_bytes = resultado
+
+        elif isinstance(
+            resultado,
+            bytearray,
+        ):
+
+            zip_bytes = bytes(
+                resultado
+            )
+
+        elif hasattr(
+            resultado,
+            "getvalue",
+        ):
+
+            zip_bytes = resultado.getvalue()
+
+        elif hasattr(
+            resultado,
+            "read",
+        ):
+
+            resultado.seek(0)
+
+            zip_bytes = resultado.read()
+
+        else:
+
+            return False, (
+                "O tratamento não retornou um ZIP válido."
+            )
+
+        if not zip_bytes:
+
+            return False, (
+                "O ZIP gerado está vazio."
+            )
+
+        return True, zip_bytes
+
+    except Exception as e:
+
+        return False, (
+            f"Erro no tratamento: {e}"
+        )
+
+
+# =============================================================================
+# ESTADO DA APLICAÇÃO
+# =============================================================================
+
+if "codigo_busca" not in st.session_state:
+    st.session_state[
+        "codigo_busca"
+    ] = ""
+
+if "dados_imovel" not in st.session_state:
+    st.session_state[
+        "dados_imovel"
+    ] = None
+
+if "confirmar_tratamento" not in st.session_state:
+    st.session_state[
+        "confirmar_tratamento"
+    ] = False
+
+if "fotos_tratadas_zip" not in st.session_state:
+    st.session_state[
+        "fotos_tratadas_zip"
+    ] = None
+
+if "fotos_tratadas_nome" not in st.session_state:
+    st.session_state[
+        "fotos_tratadas_nome"
+    ] = "fotos_tratadas.zip"
 
 
 # =============================================================================
 # CABEÇALHO
 # =============================================================================
 
-col_voltar, col_vazio = st.columns([1, 5])
+st.title(
+    "Carvalho Ferreira"
+)
 
-with col_voltar:
+st.caption(
+    "Painel de gestao e geracao de materiais"
+)
 
-    if st.button("← Voltar"):
 
-        st.switch_page("app.py")
-
+# =============================================================================
+# BUSCA DO IMÓVEL
+# =============================================================================
 
 st.markdown(
-    f"""
-    <div class="material-card">
-
-        <div class="property-code">
-            {codigo}
-        </div>
-
-        <div class="property-title">
-            Materiais do imóvel
-        </div>
-
-        <div class="property-price">
-            Tudo pronto para usar
-        </div>
-
-    </div>
-    """,
-    unsafe_allow_html=True,
+    "### Seleção de Imóvel"
 )
 
-
-# =============================================================================
-# DRIVE
-# =============================================================================
-
-with st.spinner("Carregando materiais..."):
-
-    pasta_imovel_id = encontrar_pasta_imovel(codigo)
-
-if not pasta_imovel_id:
-
-    st.error(
-        f"Não encontrei a pasta do imóvel {codigo} no Google Drive."
-    )
-
-    st.stop()
-
-
-subpastas = listar_subpastas(pasta_imovel_id)
-
-
-# =============================================================================
-# AÇÕES RÁPIDAS
-# =============================================================================
-
-st.markdown("### Ações rápidas")
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-
-    if st.button(
-        "📝 COPY",
-        use_container_width=True
-    ):
-
-        st.session_state["material_aba"] = "COPY"
-
-
-with col2:
-
-    if st.button(
-        "📱 STATUS",
-        use_container_width=True
-    ):
-
-        st.session_state["material_aba"] = "STATUS"
-
-
-with col3:
-
-    if st.button(
-        "📲 POSTS",
-        use_container_width=True
-    ):
-
-        st.session_state["material_aba"] = "POSTS"
-
-
-with col4:
-
-    if st.button(
-        "📄 PDF",
-        use_container_width=True
-    ):
-
-        st.session_state["material_aba"] = "PDF"
-
-
-st.markdown("---")
-
-
-# =============================================================================
-# COPY
-# =============================================================================
-
-st.markdown("### 📝 Copy")
-
-legenda1, legenda2 = buscar_legendas(codigo)
-
-col1, col2 = st.columns(2)
-
-with col1:
-
-    st.markdown(
-        """
-        <div class="material-card">
-        <div class="material-title">Legenda 1</div>
-        <div class="material-description">
-        Texto principal para publicação
-        </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    if legenda1:
-
-        st.text_area(
-            "Legenda 1",
-            value=legenda1,
-            height=220,
-            key=f"legenda1_{codigo}",
-            label_visibility="collapsed",
-        )
-
-        st.code(
-            legenda1,
-            language=None,
-        )
-
-    else:
-
-        st.info("Legenda 1 não cadastrada.")
-
-
-with col2:
-
-    st.markdown(
-        """
-        <div class="material-card">
-        <div class="material-title">Legenda 2</div>
-        <div class="material-description">
-        Segunda opção de texto
-        </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    if legenda2:
-
-        st.text_area(
-            "Legenda 2",
-            value=legenda2,
-            height=220,
-            key=f"legenda2_{codigo}",
-            label_visibility="collapsed",
-        )
-
-        st.code(
-            legenda2,
-            language=None,
-        )
-
-    else:
-
-        st.info("Legenda 2 não cadastrada.")
-
-
-# =============================================================================
-# STATUS
-# =============================================================================
-
-st.markdown("---")
-st.markdown("### 📱 Status")
-
-arquivos_status = arquivos_da_pasta(
-    subpastas,
-    "STATUS"
+col_busca1, col_busca2 = st.columns(
+    [3, 1]
 )
 
-if not arquivos_status:
+with col_busca1:
 
-    st.info(
-        "Nenhum material de Status encontrado."
+    codigo_input = st.text_input(
+        "Código do Imóvel",
+        value=st.session_state[
+            "codigo_busca"
+        ],
+        placeholder="Ex: CF003",
+        label_visibility="collapsed",
+        key="campo_codigo_principal",
     )
 
-else:
+with col_busca2:
 
-    colunas = st.columns(3)
+    buscar = st.button(
+        "Buscar",
+        use_container_width=True,
+        type="primary",
+        key="btn_buscar_principal",
+    )
 
-    for indice, arquivo in enumerate(arquivos_status):
 
-        with colunas[indice % 3]:
+codigo_digitado = (
+    codigo_input or ""
+).strip().upper()
 
-            st.markdown(
-                f"**{arquivo['name']}**"
-            )
 
-            visualizar_key = (
-                f"ver_status_{codigo}_{arquivo['id']}"
-            )
+if (
+    buscar
+    and codigo_digitado
+) or (
+    codigo_digitado
+    and codigo_digitado
+    != st.session_state[
+        "codigo_busca"
+    ]
+):
 
-            if st.button(
-                "Visualizar",
-                key=visualizar_key,
-                use_container_width=True,
-            ):
+    st.session_state[
+        "codigo_busca"
+    ] = codigo_digitado
 
-                st.session_state[
-                    f"preview_{arquivo['id']}"
-                ] = True
+    if codigo_digitado:
 
-            if st.session_state.get(
-                f"preview_{arquivo['id']}",
-                False
-            ):
+        with st.spinner(
+            "Buscando dados na planilha..."
+        ):
 
-                dados = baixar_arquivo(
-                    arquivo["id"]
+            dados_encontrados = (
+                buscar_imovel(
+                    codigo_digitado
                 )
-
-                if dados:
-
-                    st.image(
-                        dados,
-                        use_container_width=True,
-                    )
-
-                    st.download_button(
-                        "Baixar / compartilhar",
-                        data=dados,
-                        file_name=arquivo["name"],
-                        key=f"download_status_{arquivo['id']}",
-                        use_container_width=True,
-                    )
-
-
-# =============================================================================
-# POSTS
-# =============================================================================
-
-st.markdown("---")
-st.markdown("### 📲 Posts")
-
-arquivos_posts = arquivos_da_pasta(
-    subpastas,
-    "POSTS"
-)
-
-if not arquivos_posts:
-
-    st.info(
-        "Nenhum post encontrado."
-    )
-
-else:
-
-    colunas = st.columns(3)
-
-    for indice, arquivo in enumerate(arquivos_posts):
-
-        with colunas[indice % 3]:
-
-            st.markdown(
-                f"**{arquivo['name']}**"
             )
 
-            preview_key = (
-                f"preview_post_{arquivo['id']}"
+        if dados_encontrados is None:
+
+            st.session_state[
+                "dados_imovel"
+            ] = None
+
+            st.warning(
+                f"Registro {codigo_digitado} nao localizado."
             )
 
-            if st.button(
-                "Visualizar",
-                key=preview_key,
-                use_container_width=True,
-            ):
+        else:
 
-                st.session_state[
-                    f"post_preview_{arquivo['id']}"
-                ] = True
+            st.session_state[
+                "dados_imovel"
+            ] = dados_encontrados
 
-            if st.session_state.get(
-                f"post_preview_{arquivo['id']}",
-                False
-            ):
+            carregar_dados_na_interface(
+                dados_encontrados
+            )
 
-                dados = baixar_arquivo(
-                    arquivo["id"]
-                )
-
-                if dados:
-
-                    st.image(
-                        dados,
-                        use_container_width=True,
-                    )
-
-                    st.download_button(
-                        "Baixar / compartilhar",
-                        data=dados,
-                        file_name=arquivo["name"],
-                        key=f"download_post_{arquivo['id']}",
-                        use_container_width=True,
-                    )
+    st.rerun()
 
 
-# =============================================================================
-# FOTOS
-# =============================================================================
-
-st.markdown("---")
-st.markdown("### 📸 Fotos tratadas")
-
-arquivos_fotos = arquivos_da_pasta(
-    subpastas,
-    "FOTOS TRATADAS"
+codigo_busca = (
+    st.session_state
+    .get(
+        "codigo_busca",
+        "",
+    )
+    .strip()
+    .upper()
 )
 
-if not arquivos_fotos:
+dados_imovel = (
+    st.session_state
+    .get(
+        "dados_imovel",
+        None,
+    )
+)
 
-    st.info(
-        "Nenhuma foto tratada encontrada."
+
+if codigo_busca and dados_imovel:
+
+    st.success(
+        f"Imóvel **{codigo_busca}** carregado com sucesso!"
     )
 
-else:
 
-    colunas = st.columns(4)
+# =============================================================================
+# SIDEBAR
+# =============================================================================
 
-    for indice, arquivo in enumerate(arquivos_fotos):
-
-        with colunas[indice % 4]:
-
-            if arquivo_e_imagem(arquivo):
-
-                preview_key = (
-                    f"foto_preview_{arquivo['id']}"
-                )
-
-                if st.button(
-                    arquivo["name"],
-                    key=preview_key,
-                    use_container_width=True,
-                ):
-
-                    st.session_state[
-                        f"foto_aberta_{arquivo['id']}"
-                    ] = True
-
-                if st.session_state.get(
-                    f"foto_aberta_{arquivo['id']}",
-                    False,
-                ):
-
-                    dados = baixar_arquivo(
-                        arquivo["id"]
-                    )
-
-                    if dados:
-
-                        st.image(
-                            dados,
-                            use_container_width=True,
-                        )
-
-                        st.download_button(
-                            "Baixar",
-                            data=dados,
-                            file_name=arquivo["name"],
-                            key=f"download_foto_{arquivo['id']}",
-                            use_container_width=True,
-                        )
+st.sidebar.markdown(
+    "### Materiais & Ações"
+)
 
 
 # =============================================================================
 # PDF
 # =============================================================================
 
-st.markdown("---")
-st.markdown("### 📄 Apresentação")
+if st.sidebar.button(
+    "Gerar PDF",
+    use_container_width=True,
+    key="btn_pdf",
+):
 
-arquivos_pdf = arquivos_da_pasta(
-    subpastas,
-    "PDF"
-)
+    if not codigo_busca:
 
-if not arquivos_pdf:
-
-    st.info(
-        "Nenhum PDF encontrado."
-    )
-
-else:
-
-    for arquivo in arquivos_pdf:
-
-        st.markdown(
-            f"""
-            <div class="material-card">
-
-            <div class="material-title">
-                {arquivo["name"]}
-            </div>
-
-            <div class="material-description">
-                Apresentação completa do imóvel
-            </div>
-
-            </div>
-            """,
-            unsafe_allow_html=True,
+        st.sidebar.error(
+            "Informe o codigo."
         )
 
-        dados_pdf = baixar_arquivo(
-            arquivo["id"]
-        )
+    else:
 
-        if dados_pdf:
+        with st.spinner(
+            "Gerando PDF..."
+        ):
 
-            col1, col2 = st.columns(2)
-
-            with col1:
-
-                st.download_button(
-                    "📥 Baixar PDF",
-                    data=dados_pdf,
-                    file_name=arquivo["name"],
-                    mime="application/pdf",
-                    key=f"download_pdf_{arquivo['id']}",
-                    use_container_width=True,
+            ok, res = (
+                executar_gerador_pdf(
+                    codigo_busca
                 )
+            )
 
-            with col2:
+        if ok:
 
-                if arquivo.get("webViewLink"):
+            st.session_state[
+                "pdf_bytes"
+            ] = res
 
-                    st.link_button(
-                        "↗ Abrir apresentação",
-                        url=arquivo["webViewLink"],
-                        use_container_width=True,
-                    )
+            st.session_state[
+                "pdf_nome"
+            ] = (
+                f"{codigo_busca}.pdf"
+            )
 
+            st.sidebar.success(
+                "PDF gerado."
+            )
 
-# =============================================================================
-# VÍDEOS
-# =============================================================================
+        else:
 
-st.markdown("---")
-st.markdown("### 🎥 Vídeos")
-
-arquivos_videos = arquivos_da_pasta(
-    subpastas,
-    "VIDEOS"
-)
-
-if not arquivos_videos:
-
-    st.info(
-        "Nenhum vídeo encontrado."
-    )
-
-else:
-
-    for arquivo in arquivos_videos:
-
-        st.markdown(
-            f"**{arquivo['name']}**"
-        )
-
-        if arquivo.get("webViewLink"):
-
-            st.link_button(
-                "Abrir vídeo",
-                url=arquivo["webViewLink"],
-                use_container_width=True,
+            st.sidebar.error(
+                res
             )
 
 
+if st.session_state.get(
+    "pdf_bytes"
+):
+
+    st.sidebar.download_button(
+        "Baixar PDF",
+        data=st.session_state[
+            "pdf_bytes"
+        ],
+        file_name=st.session_state.get(
+            "pdf_nome",
+            "dossie.pdf",
+        ),
+        mime="application/pdf",
+        use_container_width=True,
+        key="dl_pdf_sidebar",
+    )
+
+
 # =============================================================================
-# FINAL
+# POSTS
 # =============================================================================
 
-st.markdown("---")
+if st.sidebar.button(
+    "Gerar Posts",
+    use_container_width=True,
+    key="btn_posts",
+):
 
-st.markdown(
-    """
-    <div style="
-        text-align:center;
-        color:#777;
-        padding:20px;
-    ">
-        Carvalho Ferreira · Central de Materiais
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+    if not codigo_busca:
+
+        st.sidebar.error(
+            "Informe o codigo."
+        )
+
+    else:
+
+        with st.spinner(
+            "Gerando posts..."
+        ):
+
+            ok, res = (
+                executar_gerador_posts(
+                    codigo_busca
+                )
+            )
+
+        if ok:
+
+            st.session_state[
+                "posts_resultado"
+            ] = res
+
+            st.sidebar.success(
+                "Posts gerados."
+            )
+
+        else:
+
+            st.sidebar.error(
+                res
+            )
+
+
+if (
+    st.session_state.get(
+        "posts_resultado"
+    )
+    is not None
+):
+
+    posts_res = (
+        st.session_state[
+            "posts_resultado"
+        ]
+    )
+
+    if isinstance(
+        posts_res,
+        (bytes, bytearray),
+    ):
+
+        st.sidebar.download_button(
+            "Baixar Posts (ZIP)",
+            data=posts_res,
+            file_name=(
+                f"posts_{codigo_busca}.zip"
+            ),
+            mime="application/zip",
+            use_container_width=True,
+            key="dl_posts_bytes",
+        )
+
+    else:
+
+        caminho = Path(
+            str(posts_res)
+        )
+
+        if caminho.exists():
+
+            with open(
+                caminho,
+                "rb",
+            ) as f:
+
+                st.sidebar.download_button(
+                    "Baixar Posts (ZIP)",
+                    data=f.read(),
+                    file_name=caminho.name,
+                    mime="application/zip",
+                    use_container_width=True,
+                    key="dl_posts_path",
+                )
+
+
+# =============================================================================
+# TRATAR FOTOS
+# =============================================================================
+
+if st.sidebar.button(
+    "Tratar fotos",
+    use_container_width=True,
+    key="btn_tratar",
+):
+
+    if not codigo_busca:
+
+        st.sidebar.error(
+            "Informe o codigo."
+        )
+
+    else:
+
+        st.session_state[
+            "confirmar_tratamento"
+        ] = True
+
+
+if st.session_state.get(
+    "confirmar_tratamento"
+):
+
+    st.sidebar.warning(
+        "O tratamento pode demorar alguns minutos."
+    )
+
+    a1, a2 = st.sidebar.columns(
+        2
+    )
+
+    with a1:
+
+        if st.button(
+            "Sim",
+            use_container_width=True,
+            key="trat_sim",
+        ):
+
+            st.session_state[
+                "confirmar_tratamento"
+            ] = False
+
+            ok, resultado = (
+                executar_tratador_fotos(
+                    codigo_busca
+                )
+            )
+
+            if ok:
+
+                st.session_state[
+                    "fotos_tratadas_zip"
+                ] = resultado
+
+                st.session_state[
+                    "fotos_tratadas_nome"
+                ] = (
+                    f"{codigo_busca}_fotos_tratadas.zip"
+                )
+
+                st.sidebar.success(
+                    "Fotos tratad
