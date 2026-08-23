@@ -152,8 +152,8 @@ def buscar_legendas(codigo):
 
             if normalizar(row[0]) == codigo_busca:
                 dados = {cabecalho[i]: row[i] for i in range(len(cabecalho))}
-                legenda1 = dados.get("LEGENDA 1", "") or dados.get("LEGENDA 1", "")
-                legenda2 = dados.get("LEGENDA 2", "") or dados.get("LEGENDA 2", "")
+                legenda1 = dados.get("LEGENDA 1", "") or dados.get("LEGENDA 01", "")
+                legenda2 = dados.get("LEGENDA 2", "") or dados.get("LEGENDA 02", "")
                 return legenda1, legenda2
 
         return "", ""
