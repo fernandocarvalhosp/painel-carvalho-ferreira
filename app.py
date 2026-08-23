@@ -136,7 +136,7 @@ def buscar_imovel(codigo):
         .values()
         .get(
             spreadsheetId=SPREADSHEET_ID,
-            range=f"'{NOME_ABA}'!A:Z",
+            range=f"'{NOME_ABA}'!A:AZ",
         )
         .execute()
     )
@@ -183,7 +183,7 @@ def salvar_dados(
         .values()
         .get(
             spreadsheetId=SPREADSHEET_ID,
-            range=f"'{NOME_ABA}'!A:Z",
+            range=f"'{NOME_ABA}'!A:AZ",
         )
         .execute()
     )
@@ -195,7 +195,7 @@ def salvar_dados(
 
     for i, row in enumerate(rows):
       if row and normalizar(row[0]) == normalizar(codigo):
-        range_to_update = f"'{NOME_ABA}'!A{i + 1}:Z{i + 1}"
+        range_to_update = f"'{NOME_ABA}'!A{i + 1}:AZ{i + 1}"
 
         body = {"values": [novos_dados]}
 
@@ -258,6 +258,8 @@ def carregar_dados_na_interface(
       "f_titulo2": "TITULO 2",
       "f_titulo3": "TITULO 3",
       "f_descricao": "DESCRICAO",
+      "f_legenda1": "LEGENDA 1",
+      "f_legenda2": "LEGENDA 2",
       "f_obs": "OBS EXTRAS",
   }
 
@@ -847,7 +849,7 @@ with tab2:
 
 
 # =============================================================================
-# DIVULGAÇÃO
+# DIVULGAÇÃO (COM LEGENDAS 1 E 2)
 # =============================================================================
 
 with tab3:
@@ -870,6 +872,21 @@ with tab3:
       "Descricao",
       height=150,
       key="f_descricao",
+  )
+
+  st.markdown("---")
+  st.markdown("### 📝 Legendas para Redes Sociais")
+
+  nova_legenda_1 = st.text_area(
+      "Legenda 1",
+      height=130,
+      key="f_legenda1",
+  )
+
+  nova_legenda_2 = st.text_area(
+      "Legenda 2",
+      height=130,
+      key="f_legenda2",
   )
 
   novo_obs_extras = st.text_area(
@@ -911,6 +928,7 @@ if st.button(
     st.warning("Busque um imovel primeiro.")
 
   else:
+    # A ordem exata reflete as colunas padrão da planilha (incluindo LEGENDA 1 e LEGENDA 2)
     dados_para_salvar = [
         novo_codigo,
         novo_tipo,
@@ -937,6 +955,8 @@ if st.button(
         novo_titulo_2,
         novo_titulo_3,
         novo_descricao,
+        nova_legenda_1,  # LEGENDA 1
+        nova_legenda_2,  # LEGENDA 2
         novo_obs_extras,
     ]
 
@@ -945,7 +965,7 @@ if st.button(
           codigo_busca,
           dados_para_salvar,
       ):
-        st.success("Dados atualizados.")
+        st.success("Dados atualizados com sucesso (incluindo as legendas)!")
 
       else:
         st.error("Nao foi possivel salvar.")
