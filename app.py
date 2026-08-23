@@ -29,7 +29,7 @@ NOME_ABA = "Imoveis"
 
 
 # =============================================================================
-# ESTILO VISUAL SOFISTICADO (DARK & PREMIUM) + ALINHAMENTO DE CARDS
+# ESTILO VISUAL SOFISTICADO (DARK & PREMIUM)
 # =============================================================================
 
 st.markdown(
@@ -64,57 +64,17 @@ st.markdown(
         color: #f7f5ef !important;
     }
 
-    /* Card do Imóvel com altura fixa e comportamento flexbox para alinhar tudo embaixo */
+    /* Card do Imóvel */
     .imovel-card {
         background-color: #161b22;
         border: 1px solid #30363d;
         border-radius: 12px;
         padding: 16px;
         margin-bottom: 20px;
-        height: 480px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
         transition: border-color 0.2s ease-in-out;
     }
     .imovel-card:hover {
         border-color: #d4af37;
-    }
-
-    /* Container rígido para a imagem ou placeholder */
-    .img-container {
-        width: 100%;
-        height: 200px;
-        min-height: 200px;
-        max-height: 200px;
-        border-radius: 8px;
-        overflow: hidden;
-        margin-bottom: 8px;
-        background-color: #1f2937;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-    }
-
-    /* Força qualquer imagem dentro do container a preencher perfeitamente sem distorcer */
-    .img-container img {
-        width: 100% !important;
-        height: 100% !important;
-        object-fit: cover !important;
-    }
-
-    /* Caixa reservada para quando o imóvel estiver sem foto */
-    .sem-foto-placeholder {
-        width: 100%;
-        height: 100%;
-        border: 2px dashed #374151;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #8b949e;
-        font-size: 0.9rem;
     }
 
     /* Código em destaque */
@@ -390,17 +350,11 @@ else:
             with st.container():
                 st.markdown('<div class="imovel-card">', unsafe_allow_html=True)
                 
-                # Contêiner rígido da imagem / placeholder
-                st.markdown('<div class="img-container">', unsafe_allow_html=True)
                 foto_bytes = obter_primeira_foto_drive(imovel["codigo"])
                 if foto_bytes:
                     st.image(foto_bytes, use_container_width=True)
                 else:
-                    st.markdown(
-                        '<div class="sem-foto-placeholder">🖼️ Sem foto</div>', 
-                        unsafe_allow_html=True
-                    )
-                st.markdown('</div>', unsafe_allow_html=True)
+                    st.markdown("🖼️ *Miniatura não configurada*")
                 
                 st.markdown(f'<div class="codigo-tag">🏷️ {imovel["codigo"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="info-sub">{imovel["bairro"]} • {imovel["cidade"]}</div>', unsafe_allow_html=True)
