@@ -5,8 +5,10 @@ import sys
 import os
 from pathlib import Path
 
-# Adiciona a pasta raiz (pai) ao caminho do Python para encontrar arquivos fora de 'pages'
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# FORÇA O CAMINHO EXATO: Insere a pasta raiz (pai) no *início* das rotas de busca do Python
+raiz_projeto = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if raiz_projeto not in sys.path:
+    sys.path.insert(0, raiz_projeto)
 
 import importlib
 import streamlit as st
