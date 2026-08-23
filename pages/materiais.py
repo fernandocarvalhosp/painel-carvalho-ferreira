@@ -52,8 +52,16 @@ st.markdown(
         max-width: 900px;
     }
 
-    /* Títulos visíveis e elegantes */
-    h1, h2, h3 {
+    /* Títulos principal h1 da pagina */
+    h1 {
+        font-size: 1.8rem !important;
+        color: #f7f5ef !important;
+        margin-bottom: 1rem;
+    }
+
+    
+    /* Demais Títulos visíveis e elegantes */
+    h2, h3 {
         color: #f7f5ef !important;
     }
 
