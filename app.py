@@ -759,17 +759,20 @@ st.sidebar.markdown(
 
 st.sidebar.markdown("---")
 
-if st.sidebar.button(
-    "📂 Materiais / Compartilhar",
-    use_container_width=True,
-    type="primary",
-    key="btn_materiais",
-):
-    if not codigo_busca:
-        st.sidebar.error("Busque um imóvel primeiro.")
-    else:
-        st.session_state["codigo_materiais"] = codigo_busca
-        st.switch_page("pages/materiais.py")
+if codigo_busca:
+    st.sidebar.page_link(
+        "pages/materiais.py",
+        label="📂 Materiais / Compartilhar",
+        icon="📂",
+        use_container_width=True,
+    )
+else:
+    st.sidebar.button(
+        "📂 Materiais / Compartilhar",
+        use_container_width=True,
+        disabled=True,
+        help="Busque um imóvel primeiro",
+    )
 
 
 # =============================================================================
