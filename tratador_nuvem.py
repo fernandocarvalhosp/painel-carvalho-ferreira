@@ -2,7 +2,15 @@
 
 import io
 import os
+import sys
 import zipfile
+
+from pathlib import Path
+
+# GARANTE QUE A RAIZ ESTÁ NO CAMINHO DO PYTHON
+raiz_projeto = os.path.abspath(os.path.dirname(__file__))
+if raiz_projeto not in sys.path:
+    sys.path.insert(0, raiz_projeto)
 
 from PIL import (
     Image,
@@ -233,25 +241,21 @@ def obter_logo_bytes(service):
         return None
 
     try:
-        from drive_service import (
-            buscar_pasta_por_nome,
-            listar_itens_pasta,
-            baixar_arquivo_bytes,
-        )
+        import drive_service
 
         ID_PASTA_MARCA = "19b_7n4ER-hmFyhvMmFIO1pBmPlRu85aA"
 
-        id_logo = buscar_pasta_por_nome(service, NOME_PASTA_LOGO, ID_PASTA_MARCA)
+        id_logo = drive_service.buscar_pasta_por_nome(service, NOME_PASTA_LOGO, ID_PASTA_MARCA)
         if not id_logo:
             return None
 
-        arquivos = listar_itens_pasta(service, id_logo)
+        arquivos = drive_service.listar_itens_pasta(service, id_logo)
         for arquivo in arquivos:
             nome = arquivo.get("name", "").lower()
             mime_type = arquivo.get("mimeType", "")
 
             if (nome.endswith((".png", ".jpg", ".jpeg", ".webp")) or mime_type.startswith("image/")):
-                dados = baixar_arquivo_bytes(service, arquivo["id"])
+                dados = drive_service.baixar_arquivo_bytes(service, arquivo["id"])
                 if dados:
                     return dados
 
@@ -350,24 +354,20 @@ def executar_tratamento_imovel(service, codigo_imovel, logo_bytes=None):
     Busca as fotos no Google Drive, trata as imagens e devolve um ZIP
     contendo as fotos normais + a pasta MINIATURA.
     """
-    from drive_service import (
-        encontrar_pasta_imovel,
-        listar_itens_pasta,
-        baixar_foto_bytes,
-    )
+    import drive_service
 
     codigo_imovel = str(codigo_imovel).strip().upper()
     if not codigo_imovel or service is None:
         return None
 
-    id_pasta_imovel = encontrar_pasta_imovel(service, codigo_imovel)
+    id_pasta_imovel = drive_service.encontrar_pasta_imovel(service, codigo_imovel)
     if not id_pasta_imovel:
         return None
 
     if logo_bytes is None:
         logo_bytes = obter_logo_bytes(service)
 
-    arquivos = listar_itens_pasta(service, id_pasta_imovel)
+    arquivos = drive_service.listar_itens_pasta(service, id_pasta_imovel)
     imagens = []
 
     for arquivo in arquivos:
@@ -396,7 +396,7 @@ def executar_tratamento_imovel(service, codigo_imovel, logo_bytes=None):
             if not file_id:
                 continue
 
-            stream_bruto = baixar_foto_bytes(service, file_id)
+            stream_bruto = drive_service.baixar_foto_bytes(service, file_id)
             if not stream_bruto:
                 continue
 
@@ -421,9 +421,15 @@ def executar_tratamento_imovel(service, codigo_imovel, logo_bytes=None):
             print(f"Erro na foto {nome_original}: {erro}", flush=True)
         finally:
             if stream_bruto and hasattr(stream_bruto, "close"):
-                try: stream_bruto.close() except Exception: pass
+                try:
+                    stream_bruto.close()
+                except Exception:
+                    pass
             if stream_tratado and hasattr(stream_tratado, "close"):
-                try: stream_tratado.close() except Exception: pass
+                try:
+                    stream_tratado.close()
+                except Exception:
+                    pass
 
     if not fotos_tratadas:
         return None
@@ -443,9 +449,9 @@ def obter_service():
         creds_dict = dict(st.secrets["google_credentials"])
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
-        from drive_service import SCOPES
+        import drive_service
 
-        creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+        creds = service_account.Credentials.from_service_account_info(creds_dict, scopes=drive_service.SCOPES)
         return build("drive", "v3", credentials=creds)
     except Exception as erro:
         print(f"Erro na conexão com Google Drive: {erro}", flush=True)
