@@ -29,7 +29,7 @@ NOME_ABA = "Imoveis"
 
 
 # =============================================================================
-# ESTILO VISUAL SOFISTICADO (DARK & PREMIUM) + GRID RESPONSIVO
+# ESTILO VISUAL SOFISTICADO (DARK & PREMIUM)
 # =============================================================================
 
 st.markdown(
@@ -64,34 +64,25 @@ st.markdown(
         color: #f7f5ef !important;
     }
 
-    /* Grid Responsivo Inteligente: 
-       - No Computador: Cria 3 colunas automáticas com largura igual.
-       - No Celular/Tela Pequena: Transforma em 1 única coluna vertical sequencial (1, 2, 3...). */
-    .grid-imoveis {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 20px;
-        margin-top: 10px;
-    }
-
-    @media (max-width: 768px) {
-        .grid-imoveis {
-            grid-template-columns: 1fr;
-        }
-    }
-
     /* Card do Imóvel */
     .imovel-card {
         background-color: #161b22;
         border: 1px solid #30363d;
         border-radius: 12px;
         padding: 16px;
-        height: 100%;
-        box-sizing: border-box;
+        margin-bottom: 20px;
         transition: border-color 0.2s ease-in-out;
     }
     .imovel-card:hover {
         border-color: #d4af37;
+    }
+
+    /* Trava de segurança para a imagem do Streamlit não ficar gigante */
+    [data-testid="stImage"] img {
+        border-radius: 8px;
+        max-height: 220px !important;
+        object-fit: cover !important;
+        width: 100% !important;
     }
 
     /* Código em destaque */
@@ -105,7 +96,6 @@ st.markdown(
         border: 1px solid #30363d;
         display: inline-block;
         margin-bottom: 8px;
-        margin-top: 8px;
     }
 
     /* Preço do imóvel */
@@ -339,11 +329,11 @@ for item in lista_imoveis:
         if termo not in texto_alvo:
             continue
             
-    if filtro_quartos != "Todos":
+    if filtro_quartos != "Testes": # mantido compatível
         q_str = "".join(filter(str.isdigit, str(item["quartos"])))
         if q_str:
             q_num = int(q_str)
-            min_q = 4 if filtro_quartos == "4+" else int(filtro_quartos)
+            min_q = 4 if filtro_quartos == "4+" else (int(filtro_quartos) if filtro_quartos.isdigit() else 0)
             if q_num < min_q:
                 continue
 
@@ -351,7 +341,7 @@ for item in lista_imoveis:
 
 
 # =============================================================================
-# EXIBIÇÃO DOS RESULTADOS (GRID CSS RESPONSIVO)
+# EXIBIÇÃO DOS RESULTADOS (COLUNAS NATIVAS COM TRAVA DE IMAGEM)
 # =============================================================================
 
 st.markdown(f"### Imóveis Encontrados ({len(imoveis_filtrados)})")
@@ -359,35 +349,31 @@ st.markdown(f"### Imóveis Encontrados ({len(imoveis_filtrados)})")
 if not imoveis_filtrados:
     st.info("Nenhum imóvel corresponde aos filtros selecionados.")
 else:
-    # Abre a grade CSS inteligente
-    st.markdown('<div class="grid-imoveis">', unsafe_allow_html=True)
+    colunas = st.columns(3)
     
     for indice, imovel in enumerate(imoveis_filtrados):
-        # Cada item é renderizado dentro do fluxo linear do grid
-        card_html = f"""
-        <div class="imovel-card">
-        """
-        st.markdown(card_html, unsafe_allow_html=True)
+        coluna_atual = colunas[indice % 3]
         
-        # Imagem ou placeholder mantendo o tamanho natural sem travar
-        foto_bytes = obter_primeira_foto_drive(imovel["codigo"])
-        if foto_bytes:
-            st.image(foto_bytes, use_container_width=True)
-        else:
-            st.markdown("🖼️ *Miniatura não configurada*")
-        
-        st.markdown(f'<div class="codigo-tag">🏷️ {imovel["codigo"]}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="info-sub">{imovel["bairro"]} • {imovel["cidade"]}</div>', unsafe_allow_html=True)
-        
-        if imovel["tipo"]:
-            st.markdown(f"**{imovel['tipo']}**")
-            
-        st.markdown(f'<div class="preco-imovel">{imovel["valor"]}</div>', unsafe_allow_html=True)
-        
-        if st.button("📂 Acessar Materiais", key=f"btn_mat_{imovel['codigo']}_{indice}", use_container_width=True):
-            st.session_state["codigo_materiais"] = imovel["codigo"]
-            st.switch_page("pages/materiais.py")
-            
-        st.markdown('</div>', unsafe_allow_html=True) # Fecha o imovel-card
-        
-    st.markdown('</div>', unsafe_allow_html=True) # Fecha o grid-imoveis
+        with coluna_atual:
+            with st.container():
+                st.markdown('<div class="imovel-card">', unsafe_allow_html=True)
+                
+                foto_bytes = obter_primeira_foto_drive(imovel["codigo"])
+                if foto_bytes:
+                    st.image(foto_bytes, use_container_width=True)
+                else:
+                    st.markdown("🖼️ *Miniatura não configurada*")
+                
+                st.markdown(f'<div class="codigo-tag">🏷️ {imovel["codigo"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="info-sub">{imovel["bairro"]} • {imovel["cidade"]}</div>', unsafe_allow_html=True)
+                
+                if imovel["tipo"]:
+                    st.markdown(f"**{imovel['tipo']}**")
+                    
+                st.markdown(f'<div class="preco-imovel">{imovel["valor"]}</div>', unsafe_allow_html=True)
+                
+                if st.button("📂 Acessar Materiais", key=f"btn_mat_{imovel['codigo']}_{indice}", use_container_width=True):
+                    st.session_state["codigo_materiais"] = imovel["codigo"]
+                    st.switch_page("pages/materiais.py")
+                
+                st.markdown('</div>', unsafe_allow_html=True)
