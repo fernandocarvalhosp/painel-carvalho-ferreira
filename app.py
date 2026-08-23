@@ -98,18 +98,19 @@ def conectar_sheets():
 
 @st.cache_resource
 def conectar_drive():
-  creds_dict = dict(st.secrets["google_credentials"])
-
-  creds = service_account.Credentials.from_service_account_info(
-      creds_dict,
-      scopes=SCOPES_DRIVE,
-  )
-
-  return build(
-      "drive",
-      "v3",
-      credentials=creds,
-  )
+  try:
+    creds_dict = dict(st.secrets["google_credentials"])
+    creds = service_account.Credentials.from_service_account_info(
+        creds_dict,
+        scopes=SCOPES_DRIVE,
+    )
+    return build(
+        "drive",
+        "v3",
+        credentials=creds,
+    )
+  except Exception:
+    return None
 
 
 # =============================================================================
@@ -377,7 +378,7 @@ def executar_tratador_fotos(
         return False, "Função de tratamento não encontrada."
 
     if not resultado:
-      return False, "Nenhuma foto foi tratada."
+      return False, "Nenhuma foto foi tratada (pasta vazia ou não localizada)."
 
     if isinstance(
         resultado,
@@ -520,18 +521,21 @@ st.sidebar.markdown("### Materiais & Ações")
 
 
 # =============================================================================
-# BOTÃO MATERIAIS
+# BOTÃO MATERIAIS (SUBSTITUÍDO PARA EVITAR ERROS DE ROTA)
 # =============================================================================
 
 st.sidebar.markdown("---")
 
 if codigo_busca:
-  st.sidebar.page_link(
-      "pages/materiais.py",
-      label="📂 Materiais / Compartilhar",
-      icon="📂",
+  if st.sidebar.button(
+      "📂 Materiais / Compartilhar",
       use_container_width=True,
-  )
+      key="btn_materiais_atalho",
+  ):
+    st.info(
+        "Para acessar os materiais detalhados, utilize o menu lateral de"
+        " páginas do Streamlit (se configurado)."
+    )
 else:
   st.sidebar.button(
       "📂 Materiais / Compartilhar",
@@ -642,7 +646,7 @@ if st.session_state.get("posts_resultado") is not None:
 
 
 # =============================================================================
-# TRATAR FOTOS
+# TRATAR FOTOS (BLINDADO CONTRA PASTAS VAZIAS)
 # =============================================================================
 
 if st.sidebar.button(
@@ -683,8 +687,8 @@ if st.session_state.get("confirmar_tratamento"):
 
       else:
         st.session_state["fotos_tratadas_zip"] = None
-
-        st.sidebar.error(resultado)
+        # Exibe aviso amigável sem quebrar o app caso a pasta esteja vazia
+        st.sidebar.warning(str(resultado))
 
   with a2:
     if st.button(
