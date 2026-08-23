@@ -451,7 +451,7 @@ with tab3:
     novo_titulo_1 = st.text_input("Titulo 1", key="f_titulo1")
     novo_titulo_2 = st.text_input("Titulo 2", key="f_titulo2")
     novo_titulo_3 = st.text_input("Titulo 3", key="f_titulo3")
-    novo_descricao = st.text_area("Descricao", height=150, key="f_descricao")
+    novo_descricao = st.text_area("Descrição", height=150, key="f_descricao")
     novo_obs_extras = st.text_area("Obs Extras", height=100, key="f_obs")
     
     st.markdown("---")
