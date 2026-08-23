@@ -986,4 +986,319 @@ if st.session_state.get(
                 )
 
                 st.sidebar.success(
-                    "Fotos tratad
+                    "Fotos tratadas com sucesso."
+                )
+
+            else:
+
+                st.session_state[
+                    "fotos_tratadas_zip"
+                ] = None
+
+                st.sidebar.error(
+                    resultado
+                )
+
+    with a2:
+
+        if st.button(
+            "Nao",
+            use_container_width=True,
+            key="trat_nao",
+        ):
+
+            st.session_state[
+                "confirmar_tratamento"
+            ] = False
+
+
+# =============================================================================
+# DOWNLOAD DAS FOTOS TRATADAS
+# =============================================================================
+
+if st.session_state.get(
+    "fotos_tratadas_zip"
+):
+
+    st.sidebar.markdown(
+        "### Fotos tratadas"
+    )
+
+    st.sidebar.download_button(
+        "Baixar Fotos Tratadas",
+        data=st.session_state[
+            "fotos_tratadas_zip"
+        ],
+        file_name=st.session_state.get(
+            "fotos_tratadas_nome",
+            f"{codigo_busca}_fotos_tratadas.zip",
+        ),
+        mime="application/zip",
+        use_container_width=True,
+        type="primary",
+        key="dl_fotos_tratadas",
+    )
+
+
+# =============================================================================
+# ABAS DE CONTEÚDO
+# =============================================================================
+
+tab1, tab2, tab3 = st.tabs(
+    [
+        "Identificacao",
+        "Dados Tecnicos",
+        "Divulgacao",
+    ]
+)
+
+
+# =============================================================================
+# IDENTIFICAÇÃO
+# =============================================================================
+
+with tab1:
+
+    col_a, col_b = st.columns(
+        2
+    )
+
+    with col_a:
+
+        novo_codigo = st.text_input(
+            "Codigo",
+            key="f_codigo",
+        )
+
+        novo_tipo = st.text_input(
+            "Tipo",
+            key="f_tipo",
+        )
+
+        novo_cidade = st.text_input(
+            "Cidade",
+            key="f_cidade",
+        )
+
+        novo_bairro = st.text_input(
+            "Bairro",
+            key="f_bairro",
+        )
+
+        novo_endereco = st.text_input(
+            "Endereco",
+            key="f_endereco",
+        )
+
+    with col_b:
+
+        novo_proprietario = st.text_input(
+            "Proprietario",
+            key="f_proprietario",
+        )
+
+        novo_contato = st.text_input(
+            "Contato",
+            key="f_contato",
+        )
+
+        novo_status = st.text_input(
+            "Status",
+            key="f_status",
+        )
+
+        novo_exclus = st.text_input(
+            "Exclusividade",
+            key="f_exclus",
+        )
+
+        novo_data = st.text_input(
+            "Data",
+            key="f_data",
+        )
+
+
+# =============================================================================
+# DADOS TÉCNICOS
+# =============================================================================
+
+with tab2:
+
+    col_d, col_e = st.columns(
+        2
+    )
+
+    with col_d:
+
+        novo_valor = st.text_input(
+            "Valor",
+            key="f_valor",
+        )
+
+        novo_area_util = st.text_input(
+            "Area Util",
+            key="f_area_util",
+        )
+
+        novo_area_total = st.text_input(
+            "Area Total",
+            key="f_area_total",
+        )
+
+        novo_andar = st.text_input(
+            "Andar",
+            key="f_andar",
+        )
+
+        novo_iptu = st.text_input(
+            "IPTU",
+            key="f_iptu",
+        )
+
+    with col_e:
+
+        novo_dormitorios = st.text_input(
+            "Dormitorios",
+            key="f_dormitorios",
+        )
+
+        novo_banheiros = st.text_input(
+            "Banheiros",
+            key="f_banheiros",
+        )
+
+        novo_suites = st.text_input(
+            "Suites",
+            key="f_suites",
+        )
+
+        novo_vagas = st.text_input(
+            "Vagas",
+            key="f_vagas",
+        )
+
+
+# =============================================================================
+# DIVULGAÇÃO
+# =============================================================================
+
+with tab3:
+
+    novo_titulo_1 = st.text_input(
+        "Titulo 1",
+        key="f_titulo1",
+    )
+
+    novo_titulo_2 = st.text_input(
+        "Titulo 2",
+        key="f_titulo2",
+    )
+
+    novo_titulo_3 = st.text_input(
+        "Titulo 3",
+        key="f_titulo3",
+    )
+
+    novo_descricao = st.text_area(
+        "Descricao",
+        height=150,
+        key="f_descricao",
+    )
+
+    novo_obs_extras = st.text_area(
+        "Obs Extras",
+        height=100,
+        key="f_obs",
+    )
+
+
+# =============================================================================
+# LINKS
+# =============================================================================
+
+novo_link = obter_valor(
+    dados_imovel,
+    "LINK",
+)
+
+novo_foto = obter_valor(
+    dados_imovel,
+    "FOTO",
+)
+
+
+# =============================================================================
+# SALVAR
+# =============================================================================
+
+st.markdown("---")
+
+
+if st.button(
+    "Salvar atualizacoes",
+    type="primary",
+    use_container_width=True,
+    key="btn_salvar",
+):
+
+    if not codigo_busca:
+
+        st.warning(
+            "Busque um imovel primeiro."
+        )
+
+    else:
+
+        dados_para_salvar = [
+
+            novo_codigo,
+            novo_tipo,
+            novo_cidade,
+            novo_bairro,
+            novo_endereco,
+
+            novo_proprietario,
+            novo_contato,
+            novo_valor,
+            novo_status,
+            novo_exclus,
+            novo_data,
+
+            novo_link,
+            novo_foto,
+
+            novo_dormitorios,
+            novo_banheiros,
+            novo_suites,
+            novo_vagas,
+
+            novo_area_util,
+            novo_area_total,
+            novo_andar,
+            novo_iptu,
+
+            novo_titulo_1,
+            novo_titulo_2,
+            novo_titulo_3,
+            novo_descricao,
+            novo_obs_extras,
+        ]
+
+        with st.spinner(
+            "Salvando..."
+        ):
+
+            if salvar_dados(
+                codigo_busca,
+                dados_para_salvar,
+            ):
+
+                st.success(
+                    "Dados atualizados."
+                )
+
+            else:
+
+                st.error(
+                    "Nao foi possivel salvar."
+                )
