@@ -33,44 +33,61 @@ NOME_ABA = "Imoveis"
 
 
 # =============================================================================
-# ESTILO DA MARCA
+# ESTILO SOFISTICADO (DARK & PREMIUM)
 # =============================================================================
 
 st.markdown(
     """
     <style>
-    /* Fundo da marca */
+    /* Fundo geral escuro / sofisticado */
     .stApp {
-        background-color: #f7f5ef;
+        background-color: #0e1117;
+        color: #f0f2f6;
     }
 
     /* Container principal */
     .block-container {
-        padding-top: 2rem;
+        padding-top: 1.5rem;
         padding-bottom: 4rem;
-        max-width: 1000px;
+        max-width: 900px;
     }
 
-    /* Títulos */
+    /* Títulos visíveis e elegantes */
     h1, h2, h3 {
-        color: #0b1b33;
+        color: #f7f5ef !important;
     }
 
-    /* Botões padrão do aplicativo */
+    /* Código do imóvel em destaque limpo */
+    .codigo-imovel {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #d4af37;
+        background: #1a1f2c;
+        padding: 6px 14px;
+        border-radius: 8px;
+        display: inline-block;
+        margin-bottom: 10px;
+        border: 1px solid #30363d;
+    }
+
+    /* Botões de navegação e ações principais */
     .stButton > button,
     .stDownloadButton > button,
     .stLinkButton > button {
         border-radius: 10px;
         font-weight: 600;
-        background-color: #0b1b33;
-        color: white;
-        border: none;
+        background-color: #1f2937;
+        color: #f7f5ef;
+        border: 1px solid #374151;
+        transition: all 0.2s ease-in-out;
     }
 
     .stButton > button:hover,
-    .stDownloadButton > button:hover {
-        background-color: #162c4d;
-        color: white;
+    .stDownloadButton > button:hover,
+    .stLinkButton > button:hover {
+        background-color: #374151;
+        border-color: #d4af37;
+        color: #ffffff;
     }
     </style>
     """,
@@ -155,12 +172,12 @@ def encontrar_pasta_imovel(codigo):
     )
     resultados = (
         service.files()
-        .list(q=query, spaces="drive", fields="files(id,name)", pageSize=10)
+        .list(q=query, spaces="drive", fields="files(id,name,webViewLink)", pageSize=10)
         .execute()
     )
     pastas = resultados.get("files", [])
     if pastas:
-        return pastas[0]["id"]
+        return pastas[0]
     return None
 
 
@@ -174,7 +191,7 @@ def listar_subpastas(pasta_pai_id):
     )
     resultados = (
         service.files()
-        .list(q=query, spaces="drive", fields="files(id,name)", pageSize=50)
+        .list(q=query, spaces="drive", fields="files(id,name,webViewLink)", pageSize=50)
         .execute()
     )
     return resultados.get("files", [])
@@ -233,11 +250,6 @@ def arquivos_da_pasta(subpastas, nome):
     return listar_arquivos(pasta["id"])
 
 
-def arquivo_e_imagem(arquivo):
-    mime = arquivo.get("mimeType", "")
-    return mime.startswith("image/")
-
-
 # =============================================================================
 # VALIDAÇÃO DA SESSÃO
 # =============================================================================
@@ -252,7 +264,7 @@ if not codigo:
 
 
 # =============================================================================
-# CABEÇALHO LIMPO
+# CABEÇALHO LIMPO E VISÍVEL
 # =============================================================================
 
 col_voltar, col_vazio = st.columns([1, 5])
@@ -260,37 +272,36 @@ with col_voltar:
     if st.button("← Voltar"):
         st.switch_page("app.py")
 
-st.markdown(f"### 🏷️ Imóvel: **{codigo}**")
+# Exibição limpa do código com alta visibilidade
+st.markdown(f'<div class="codigo-imovel">🏷️ IMÓVEL: {codigo}</div>', unsafe_allow_html=True)
 st.title("Central de Materiais")
-st.caption("Selecione o material desejado para visualizar e compartilhar rapidamente.")
 
 
 # =============================================================================
 # CARREGAMENTO DO DRIVE
 # =============================================================================
 
-with st.spinner("Carregando pastas do imóvel..."):
-    pasta_imovel_id = encontrar_pasta_imovel(codigo)
+with st.spinner("Carregando pastas..."):
+    pasta_imovel = encontrar_pasta_imovel(codigo)
 
-if not pasta_imovel_id:
+if not pasta_imovel:
     st.error(f"Não encontrei a pasta do imóvel {codigo} no Google Drive.")
     st.stop()
 
+pasta_imovel_id = pasta_imovel["id"]
 subpastas = listar_subpastas(pasta_imovel_id)
 legenda1, legenda2 = buscar_legendas(codigo)
 
 
 # =============================================================================
-# MENU PRINCIPAL DE BOTÕES (DIRETO E SEM ROLAGEM)
+# MENU PRINCIPAL DE BOTÕES
 # =============================================================================
 
 st.markdown("---")
-st.markdown("### 🗂️ Escolha o material:")
 
 if "material_selecionado" not in st.session_state:
     st.session_state["material_selecionado"] = "LEGENDA_1"
 
-# Linha de botões de seleção principal
 col_b1, col_b2, col_b3, col_b4 = st.columns(4)
 with col_b1:
     if st.button("📝 Legenda 1", use_container_width=True):
@@ -331,9 +342,9 @@ if selecao == "LEGENDA_1":
     if legenda1:
         st.text_area("Texto da Legenda 1", value=legenda1, height=200, label_visibility="collapsed")
         st.code(legenda1, language=None)
-        st.info("💡 Dica: Copie o texto acima com facilidade para enviar no WhatsApp ou Instagram.")
+        st.info("💡 Toque acima para copiar o texto com facilidade.")
     else:
-        st.info("Nenhuma Legenda 1 cadastrada na planilha para este imóvel.")
+        st.info("Nenhuma Legenda 1 cadastrada na planilha.")
 
 # --- LEGENDA 2 ---
 elif selecao == "LEGENDA_2":
@@ -341,9 +352,9 @@ elif selecao == "LEGENDA_2":
     if legenda2:
         st.text_area("Texto da Legenda 2", value=legenda2, height=200, label_visibility="collapsed")
         st.code(legenda2, language=None)
-        st.info("💡 Dica: Copie o texto acima com facilidade para enviar no WhatsApp ou Instagram.")
+        st.info("💡 Toque acima para copiar o texto com facilidade.")
     else:
-        st.info("Nenhuma Legenda 2 cadastrada na planilha para este imóvel.")
+        st.info("Nenhuma Legenda 2 cadastrada na planilha.")
 
 # --- STATUS ---
 elif selecao == "STATUS":
@@ -352,9 +363,9 @@ elif selecao == "STATUS":
     if not arquivos_status:
         st.info("Nenhum material de Status encontrado.")
     else:
-        colunas = st.columns(3)
+        colunas = st.columns(2)
         for indice, arquivo in enumerate(arquivos_status):
-            with colunas[indice % 3]:
+            with colunas[indice % 2]:
                 st.markdown(f"**{arquivo['name']}**")
                 dados = baixar_arquivo(arquivo["id"])
                 if dados:
@@ -374,9 +385,9 @@ elif selecao == "POSTS":
     if not arquivos_posts:
         st.info("Nenhum post encontrado.")
     else:
-        colunas = st.columns(3)
+        colunas = st.columns(2)
         for indice, arquivo in enumerate(arquivos_posts):
-            with colunas[indice % 3]:
+            with colunas[indice % 2]:
                 st.markdown(f"**{arquivo['name']}**")
                 dados = baixar_arquivo(arquivo["id"])
                 if dados:
@@ -389,27 +400,25 @@ elif selecao == "POSTS":
                         use_container_width=True,
                     )
 
-# --- FOTOS TRATADAS ---
+# --- FOTOS TRATADAS (Otimizado para abrir direto no Drive) ---
 elif selecao == "FOTOS":
     st.markdown("### 📸 Fotos Tratadas")
-    arquivos_fotos = arquivos_da_pasta(subpastas, "FOTOS TRATADAS")
-    if not arquivos_fotos:
-        st.info("Nenhuma foto tratada encontrada.")
+    pasta_fotos = encontrar_pasta(subpastas, "FOTOS TRATADAS")
+    
+    st.info(
+        "⚡ **Dica para o Sr. Valdir:** Para evitar travamentos e facilitar o "
+        "compartilhamento em lote (várias fotos de uma vez para o WhatsApp), "
+        "as fotos estão organizadas diretamente na pasta oficial do Google Drive."
+    )
+    
+    if pasta_fotos and pasta_fotos.get("webViewLink"):
+        st.link_button(
+            "↗ Abrir Pasta de Fotos no Google Drive",
+            url=pasta_fotos["webViewLink"],
+            use_container_width=True,
+        )
     else:
-        colunas = st.columns(4)
-        for indice, arquivo in enumerate(arquivos_fotos):
-            with colunas[indice % 4]:
-                if arquivo_e_imagem(arquivo):
-                    dados = baixar_arquivo(arquivo["id"])
-                    if dados:
-                        st.image(dados, use_container_width=True)
-                        st.download_button(
-                            "📥 Baixar",
-                            data=dados,
-                            file_name=arquivo["name"],
-                            key=f"dl_foto_{arquivo['id']}",
-                            use_container_width=True,
-                        )
+        st.warning("Pasta de Fotos Tratadas não encontrada no Drive deste imóvel.")
 
 # --- PDF ---
 elif selecao == "PDF":
@@ -443,8 +452,16 @@ elif selecao == "PDF":
 # --- VÍDEOS ---
 elif selecao == "VIDEOS":
     st.markdown("### 🎥 Vídeos do Imóvel")
+    pasta_videos = encontrar_pasta(subpastas, "VIDEOS")
     arquivos_videos = arquivos_da_pasta(subpastas, "VIDEOS")
-    if not arquivos_videos:
+    
+    if not arquivos_videos and pasta_videos and pasta_videos.get("webViewLink"):
+        st.link_button(
+            "↗ Abrir Pasta de Vídeos no Google Drive",
+            url=pasta_videos["webViewLink"],
+            use_container_width=True,
+        )
+    elif not arquivos_videos:
         st.info("Nenhum vídeo encontrado.")
     else:
         for arquivo in arquivos_videos:
@@ -464,7 +481,7 @@ elif selecao == "VIDEOS":
 st.markdown("---")
 st.markdown(
     """
-    <div style="text-align:center; color:#777; padding:10px; font-size: 0.85rem;">
+    <div style="text-align:center; color:#8b949e; padding:10px; font-size: 0.85rem;">
         Carvalho Ferreira · Central de Materiais
     </div>
     """,
