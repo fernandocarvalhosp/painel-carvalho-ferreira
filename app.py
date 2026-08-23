@@ -77,9 +77,7 @@ st.markdown(
         border-color: #d4af37;
     }
 
-    /* Trava inteligente para a imagem:
-       - No computador: mantém uma altura agradável e proporcional.
-       - No celular: expande para aproveitar bem o espaço sem estourar. */
+    /* Trava inteligente para a imagem preencher bem o card */
     [data-testid="stImage"] img {
         border-radius: 8px;
         width: 100% !important;
@@ -350,10 +348,39 @@ for item in lista_imoveis:
 
 
 # =============================================================================
-# EXIBIÇÃO DOS RESULTADOS (ADAPTADO COMPUTADOR / CELULAR)
+# EXIBIÇÃO DOS RESULTADOS (ESTRUTURA COMPLETA E VALIDADA)
 # =============================================================================
 
 st.markdown(f"### Imóveis Encontrados ({len(imoveis_filtrados)})")
 
 if not imoveis_filtrados:
-...
+    st.info("Nenhum imóvel corresponde aos filtros selecionados.")
+else:
+    colunas = st.columns(3)
+    
+    for indice, imovel in enumerate(imoveis_filtrados):
+        coluna_atual = colunas[indice % 3]
+        
+        with coluna_atual:
+            with st.container():
+                st.markdown('<div class="imovel-card">', unsafe_allow_html=True)
+                
+                foto_bytes = obter_primeira_foto_drive(imovel["codigo"])
+                if foto_bytes:
+                    st.image(foto_bytes, use_container_width=True)
+                else:
+                    st.markdown("🖼️ *Miniatura não configurada*")
+                
+                st.markdown(f'<div class="codigo-tag">🏷️ {imovel["codigo"]}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="info-sub">{imovel["bairro"]} • {imovel["cidade"]}</div>', unsafe_allow_html=True)
+                
+                if imovel["tipo"]:
+                    st.markdown(f"**{imovel['tipo']}**")
+                    
+                st.markdown(f'<div class="preco-imovel">{imovel["valor"]}</div>', unsafe_allow_html=True)
+                
+                if st.button("📂 Acessar Materiais", key=f"btn_mat_{imovel['codigo']}_{indice}", use_container_width=True):
+                    st.session_state["codigo_materiais"] = imovel["codigo"]
+                    st.switch_page("pages/materiais.py")
+                
+                st.markdown('</div>', unsafe_allow_html=True)
