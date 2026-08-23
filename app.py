@@ -180,8 +180,8 @@ def carregar_dados_na_interface(dados):
         "f_titulo3": "TITULO 3",
         "f_descricao": "DESCRICAO",
         "f_obs": "OBS EXTRAS",
-        "f_legenda1": "LEGENDA 1",
-        "f_legenda2": "LEGENDA 2",
+        "f_legenda1": "LEGENDA 01",
+        "f_legenda2": "LEGENDA 02",
     }
 
     for campo, chave in campos.items():
