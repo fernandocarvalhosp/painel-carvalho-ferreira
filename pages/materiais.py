@@ -88,37 +88,6 @@ st.markdown(
         margin-bottom: 16px;
     }
 
-    .property-code {
-        color: #9a7a38;
-        font-size: 0.8rem;
-        font-weight: 700;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-    }
-
-    .property-title {
-        color: #0b1b33;
-        font-size: 2rem;
-        font-weight: 700;
-        margin: 4px 0 0 0;
-    }
-
-    .property-price {
-        color: #0b1b33;
-        font-size: 1.3rem;
-        font-weight: 600;
-        margin-top: 4px;
-    }
-
-    .quick-action {
-        background: #0b1b33;
-        color: white;
-        border-radius: 12px;
-        padding: 16px;
-        text-align: center;
-        font-weight: 600;
-    }
-
     /* Botões */
     .stButton > button,
     .stDownloadButton > button {
@@ -232,7 +201,6 @@ def buscar_legendas(codigo):
 def encontrar_pasta_imovel(codigo):
     service = conectar_drive()
 
-    # Correção aplicada: usa 'contains' para suportar nomes compostos no Drive
     query = (
         f"name contains '{codigo}' "
         f"and mimeType = 'application/vnd.google-apps.folder' "
@@ -402,38 +370,18 @@ if not codigo:
 
 
 # =============================================================================
-# CABEÇALHO
+# CABEÇALHO (Corrigido para usar elementos nativos do Streamlit)
 # =============================================================================
 
 col_voltar, col_vazio = st.columns([1, 5])
 
 with col_voltar:
-
     if st.button("← Voltar"):
-
         st.switch_page("app.py")
 
-
-st.markdown(
-    f"""
-    <div class="material-card">
-
-        <div class="property-code">
-            {codigo}
-        </div>
-
-        <div class="property-title">
-            Materiais do imóvel
-        </div>
-
-        <div class="property-price">
-            Tudo pronto para usar
-        </div>
-
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+st.markdown(f"### 🏷️ Imóvel: **{codigo}**")
+st.title("Materiais do imóvel")
+st.caption("Tudo pronto para usar")
 
 
 # =============================================================================
