@@ -272,7 +272,7 @@ def obter_logo_bytes(service):
 def gerar_zip_fotos(fotos_tratadas, codigo_imovel):
     """
     Recebe a lista de fotos tratadas, gera as fotos normais na raiz do ZIP
-    e cria uma pasta 'MINIATURA/' dentro do ZIP com as primeiras fotos leves.
+    e cria obrigatoriamente a pasta 'MINIATURA/' contendo até 3 fotos redimensionadas.
     """
     if not fotos_tratadas:
         return None
@@ -304,7 +304,7 @@ def gerar_zip_fotos(fotos_tratadas, codigo_imovel):
 
                 zip_file.writestr(nome, conteudo)
 
-            # 2. Cria as miniaturas das primeiras fotos e coloca na pasta 'MINIATURA/' dentro do ZIP
+            # 2. Garante a criação da pasta 'MINIATURA/' e insere as primeiras fotos reduzidas
             fotos_para_mini = fotos_tratadas[:QTD_MINIATURAS]
             for item in fotos_para_mini:
                 nome = item.get("nome", "foto.jpg")
@@ -328,6 +328,7 @@ def gerar_zip_fotos(fotos_tratadas, codigo_imovel):
                     conteudo_mini = buf_mini.read()
                     img.close()
 
+                    # Caminho explícito com a pasta MINIATURA no topo do ZIP
                     caminho_no_zip = f"MINIATURA/{nome}"
                     zip_file.writestr(caminho_no_zip, conteudo_mini)
                 except Exception as e:
