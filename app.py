@@ -29,7 +29,7 @@ NOME_ABA = "Imoveis"
 
 
 # =============================================================================
-# ESTILO VISUAL SOFISTICADO (DARK & PREMIUM)
+# ESTILO VISUAL SOFISTICADO (DARK & PREMIUM) + RESPONSIVIDADE CORRIGIDA
 # =============================================================================
 
 st.markdown(
@@ -77,12 +77,20 @@ st.markdown(
         border-color: #d4af37;
     }
 
-    /* Trava de segurança para a imagem do Streamlit não ficar gigante */
+    /* Trava inteligente para a imagem:
+       - No computador: mantém uma altura agradável e proporcional.
+       - No celular: expande para aproveitar bem o espaço sem estourar. */
     [data-testid="stImage"] img {
         border-radius: 8px;
-        max-height: 220px !important;
-        object-fit: cover !important;
         width: 100% !important;
+        object-fit: cover !important;
+        max-height: 240px !important;
+    }
+
+    @media (max-width: 768px) {
+        [data-testid="stImage"] img {
+            max-height: 280px !important;
+        }
     }
 
     /* Código em destaque */
@@ -96,6 +104,7 @@ st.markdown(
         border: 1px solid #30363d;
         display: inline-block;
         margin-bottom: 8px;
+        margin-top: 8px;
     }
 
     /* Preço do imóvel */
@@ -329,11 +338,11 @@ for item in lista_imoveis:
         if termo not in texto_alvo:
             continue
             
-    if filtro_quartos != "Testes": # mantido compatível
+    if filtro_quartos != "Todos":
         q_str = "".join(filter(str.isdigit, str(item["quartos"])))
         if q_str:
             q_num = int(q_str)
-            min_q = 4 if filtro_quartos == "4+" else (int(filtro_quartos) if filtro_quartos.isdigit() else 0)
+            min_q = 4 if filtro_quartos == "4+" else int(filtro_quartos)
             if q_num < min_q:
                 continue
 
@@ -341,39 +350,10 @@ for item in lista_imoveis:
 
 
 # =============================================================================
-# EXIBIÇÃO DOS RESULTADOS (COLUNAS NATIVAS COM TRAVA DE IMAGEM)
+# EXIBIÇÃO DOS RESULTADOS (ADAPTADO COMPUTADOR / CELULAR)
 # =============================================================================
 
 st.markdown(f"### Imóveis Encontrados ({len(imoveis_filtrados)})")
 
 if not imoveis_filtrados:
-    st.info("Nenhum imóvel corresponde aos filtros selecionados.")
-else:
-    colunas = st.columns(3)
-    
-    for indice, imovel in enumerate(imoveis_filtrados):
-        coluna_atual = colunas[indice % 3]
-        
-        with coluna_atual:
-            with st.container():
-                st.markdown('<div class="imovel-card">', unsafe_allow_html=True)
-                
-                foto_bytes = obter_primeira_foto_drive(imovel["codigo"])
-                if foto_bytes:
-                    st.image(foto_bytes, use_container_width=True)
-                else:
-                    st.markdown("🖼️ *Miniatura não configurada*")
-                
-                st.markdown(f'<div class="codigo-tag">🏷️ {imovel["codigo"]}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="info-sub">{imovel["bairro"]} • {imovel["cidade"]}</div>', unsafe_allow_html=True)
-                
-                if imovel["tipo"]:
-                    st.markdown(f"**{imovel['tipo']}**")
-                    
-                st.markdown(f'<div class="preco-imovel">{imovel["valor"]}</div>', unsafe_allow_html=True)
-                
-                if st.button("📂 Acessar Materiais", key=f"btn_mat_{imovel['codigo']}_{indice}", use_container_width=True):
-                    st.session_state["codigo_materiais"] = imovel["codigo"]
-                    st.switch_page("pages/materiais.py")
-                
-                st.markdown('</div>', unsafe_allow_html=True)
+...
