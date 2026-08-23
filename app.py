@@ -1,3 +1,6 @@
+# app.py
+# -*- coding: utf-8 -*-
+
 import importlib
 from pathlib import Path
 
@@ -25,15 +28,14 @@ st.set_page_config(
 
 
 # =============================================================================
-# AUTENTICAÇÃO (SENHA DE ACESSO)
+# AUTENTICAÇÃO (SENHA DE ACESSO COM SESSÃO PERSISTENTE)
 # =============================================================================
 
-
 def verificar_senha():
-  if "senha_correta" not in st.session_state:
-    st.session_state["senha_correta"] = False
+  if "autenticado" not in st.session_state:
+    st.session_state["autenticado"] = False
 
-  if st.session_state["senha_correta"]:
+  if st.session_state["autenticado"]:
     return True
 
   st.subheader("🔒 Acesso Restrito - Painel Carvalho Ferreira")
@@ -41,7 +43,7 @@ def verificar_senha():
 
   if st.button("Entrar"):
     if senha_digitada == st.secrets["passwords"]["senha_acesso"]:
-      st.session_state["senha_correta"] = True
+      st.session_state["autenticado"] = True
       st.rerun()
     else:
       st.error("Senha incorreta. Tente novamente.")
@@ -521,7 +523,7 @@ st.sidebar.markdown("### Materiais & Ações")
 
 
 # =============================================================================
-# BOTÃO MATERIAIS (SUBSTITUÍDO PARA EVITAR ERROS DE ROTA)
+# BOTÃO MATERIAIS
 # =============================================================================
 
 st.sidebar.markdown("---")
@@ -532,10 +534,7 @@ if codigo_busca:
       use_container_width=True,
       key="btn_materiais_atalho",
   ):
-    st.info(
-        "Para acessar os materiais detalhados, utilize o menu lateral de"
-        " páginas do Streamlit (se configurado)."
-    )
+    st.switch_page("pages/materiais.py")
 else:
   st.sidebar.button(
       "📂 Materiais / Compartilhar",
@@ -646,7 +645,7 @@ if st.session_state.get("posts_resultado") is not None:
 
 
 # =============================================================================
-# TRATAR FOTOS (BLINDADO CONTRA PASTAS VAZIAS)
+# TRATAR FOTOS
 # =============================================================================
 
 if st.sidebar.button(
@@ -687,7 +686,6 @@ if st.session_state.get("confirmar_tratamento"):
 
       else:
         st.session_state["fotos_tratadas_zip"] = None
-        # Exibe aviso amigável sem quebrar o app caso a pasta esteja vazia
         st.sidebar.warning(str(resultado))
 
   with a2:
