@@ -754,6 +754,28 @@ st.sidebar.markdown(
 
 
 # =============================================================================
+# BOTÃO MATERIAIS
+# =============================================================================
+
+st.sidebar.markdown("---")
+
+if codigo_busca:
+    st.sidebar.page_link(
+        "pages/materiais.py",
+        label="📂 Materiais / Compartilhar",
+        icon="📂",
+        use_container_width=True,
+    )
+else:
+    st.sidebar.button(
+        "📂 Materiais / Compartilhar",
+        use_container_width=True,
+        disabled=True,
+        help="Busque um imóvel primeiro",
+    )
+
+
+# =============================================================================
 # PDF
 # =============================================================================
 
