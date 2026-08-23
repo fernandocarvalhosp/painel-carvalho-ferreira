@@ -232,8 +232,9 @@ def buscar_legendas(codigo):
 def encontrar_pasta_imovel(codigo):
     service = conectar_drive()
 
+    # Correção aplicada: usa 'contains' para suportar nomes compostos no Drive
     query = (
-        f"name = '{codigo}' "
+        f"name contains '{codigo}' "
         f"and mimeType = 'application/vnd.google-apps.folder' "
         f"and trashed = false"
     )
