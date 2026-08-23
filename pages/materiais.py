@@ -479,7 +479,7 @@ elif selecao == "VIDEOS":
 st.markdown("---")
 st.markdown(
     """
-    <div style="text-align:center; color:#8b949e; padding:8px; font-size: 0.85rem;">
+    <div style="text-align:center; color:#8b949e; padding:8px; font-size: 0.75rem;">
         Carvalho Ferreira · Central de Materiais
     </div>
     """,
