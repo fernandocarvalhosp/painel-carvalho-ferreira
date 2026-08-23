@@ -406,9 +406,7 @@ elif selecao == "FOTOS":
     pasta_fotos = encontrar_pasta(subpastas, "FOTOS TRATADAS")
     
     st.info(
-        "⚡ **Dica para o Sr. Valdir:** Para evitar travamentos e facilitar o "
-        "compartilhamento em lote (várias fotos de uma vez para o WhatsApp), "
-        "as fotos estão organizadas diretamente na pasta oficial do Google Drive."
+        "⚡ **Clique no Botão abaixo:** Para acessar as fotos do Imóvel. "
     )
     
     if pasta_fotos and pasta_fotos.get("webViewLink"):
