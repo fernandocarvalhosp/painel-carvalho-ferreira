@@ -340,21 +340,20 @@ selecao = st.session_state["material_selecionado"]
 if selecao == "LEGENDA_1":
     st.markdown("### 📝 Legenda 1")
     if legenda1:
-        st.text_area("Texto da Legenda 1", value=legenda1, height=200, label_visibility="collapsed")
         st.code(legenda1, language=None)
-        st.info("💡 Toque acima para copiar o texto com facilidade.")
+        st.info("💡 Clique no ícone de cópia no canto superior direito do bloco acima para copiar o texto.")
     else:
-        st.info("Nenhuma Legenda 1 cadastrada na planilha.")
+        st.info("Nenhuma Legenda 01 cadastrada na planilha.")
 
 # --- LEGENDA 2 ---
 elif selecao == "LEGENDA_2":
     st.markdown("### 📝 Legenda 2")
     if legenda2:
-        st.text_area("Texto da Legenda 2", value=legenda2, height=200, label_visibility="collapsed")
         st.code(legenda2, language=None)
-        st.info("💡 Toque acima para copiar o texto com facilidade.")
+        st.info("💡 Clique no ícone de cópia no canto superior direito do bloco acima para copiar o texto.")
     else:
-        st.info("Nenhuma Legenda 2 cadastrada na planilha.")
+        st.info("Nenhuma Legenda 02 cadastrada na planilha.")
+
 
 # --- STATUS ---
 elif selecao == "STATUS":
