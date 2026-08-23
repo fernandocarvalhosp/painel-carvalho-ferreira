@@ -1,8 +1,14 @@
 # cadastro.py
 # -*- coding: utf-8 -*-
 
-import importlib
+import sys
+import os
 from pathlib import Path
+
+# Adiciona a pasta raiz (pai) ao caminho do Python para encontrar arquivos fora de 'pages'
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+import importlib
 import streamlit as st
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -125,8 +131,6 @@ def salvar_dados(codigo, novos_dados):
 
         for i, row in enumerate(rows):
             if row and normalizar(row[0]) == normalizar(codigo):
-                # Calcula dinamicamente a letra da coluna final com base na quantidade de campos salvos
-                # (Ex: até 26 colunas usa A-Z, acima disso usa AB, AC, etc.)
                 col_num = len(novos_dados)
                 coluna_final = ""
                 while col_num > 0:
