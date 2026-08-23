@@ -9,7 +9,7 @@ from googleapiclient.http import MediaIoBaseDownload
 
 
 # =============================================================================
-# CONFIGURAÇÕES DA PÁGINA
+# CONFIGURAÇÕES DA PÁGINA (Com Ocultação da Navegação Automática)
 # =============================================================================
 
 st.set_page_config(
@@ -35,6 +35,11 @@ NOME_ABA = "Imoveis"
 st.markdown(
     """
     <style>
+    /* Oculta a listagem automática de páginas do Streamlit na sidebar */
+    [data-testid="stSidebarNav"] {
+        display: none;
+    }
+
     /* Fundo geral escuro / sofisticado */
     .stApp {
         background-color: #0e1117;
@@ -200,7 +205,6 @@ def obter_primeira_foto_drive(codigo):
     try:
         drive, _ = conectar_google()
         
-        # Acha a pasta do imóvel
         query_pasta = f"name contains '{codigo}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
         res_pasta = drive.files().list(q=query_pasta, pageSize=5, fields="files(id, name)").execute()
         pastas = res_pasta.get("files", [])
@@ -217,7 +221,6 @@ def obter_primeira_foto_drive(codigo):
         if not id_imovel:
             return None
 
-        # Procura subpastas de fotos
         res_sub = drive.files().list(q=f"'{id_imovel}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false", fields="files(id, name)").execute()
         subpastas = res_sub.get("files", [])
         
@@ -228,7 +231,6 @@ def obter_primeira_foto_drive(codigo):
                 id_fotos = sub["id"]
                 break
 
-        # Pega a primeira foto da pasta
         res_arq = drive.files().list(q=f"'{id_fotos}' in parents and mimeType contains 'image/' and trashed = false", orderBy="name", pageSize=1, fields="files(id)").execute()
         arquivos = res_arq.get("files", [])
         
@@ -265,14 +267,15 @@ if not lista_imoveis:
 
 
 # =============================================================================
-# FILTROS NA BARRA LATERAL (SIDEBAR) COM BOTÃO DE LIMPAR
+# MENU E FILTROS NA BARRA LATERAL (SIDEBAR)
 # =============================================================================
 
-st.sidebar.markdown("## 🔍 Filtrar Imóveis")
+st.sidebar.markdown("## 🧭 Navegação")
+if st.sidebar.button("⚙️ Ir para Cadastro", use_container_width=True):
+    st.switch_page("pages/cadastro.py")
 
-# Gerenciador de estado para resetar filtros
-if "limpar_filtros" not in st.session_state:
-    st.session_state["limpar_filtros"] = False
+st.sidebar.markdown("---")
+st.sidebar.markdown("## 🔍 Filtrar Imóveis")
 
 if st.sidebar.button("🧹 Limpar Pesquisa", use_container_width=True):
     st.session_state["filtro_bairro"] = "Todos"
@@ -337,14 +340,12 @@ else:
             with st.container():
                 st.markdown('<div class="imovel-card">', unsafe_allow_html=True)
                 
-                # Busca a primeira foto dinamicamente direto das pastas do Drive
                 foto_bytes = obter_primeira_foto_drive(imovel["codigo"])
                 if foto_bytes:
                     st.image(foto_bytes, use_container_width=True)
                 else:
                     st.markdown("🖼️ *Sem imagem na pasta*")
                 
-                # Código e Informações
                 st.markdown(f'<div class="codigo-tag">🏷️ {imovel["codigo"]}</div>', unsafe_allow_html=True)
                 st.markdown(f'<div class="info-sub">{imovel["bairro"]} • {imovel["cidade"]}</div>', unsafe_allow_html=True)
                 
@@ -353,7 +354,6 @@ else:
                     
                 st.markdown(f'<div class="preco-imovel">{imovel["valor"]}</div>', unsafe_allow_html=True)
                 
-                # Botão para ir aos Materiais
                 if st.button("📂 Acessar Materiais", key=f"btn_mat_{imovel['codigo']}_{indice}", use_container_width=True):
                     st.session_state["codigo_materiais"] = imovel["codigo"]
                     st.switch_page("pages/materiais.py")
