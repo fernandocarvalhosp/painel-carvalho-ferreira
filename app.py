@@ -10,7 +10,7 @@ import base64
 
 
 # =============================================================================
-# CONFIGURAÇÕES DA PÁGINA E CONTATO
+# CONFIGURAÇÕES DA PÁGINA E CONTATOS
 # =============================================================================
 
 st.set_page_config(
@@ -28,8 +28,9 @@ SCOPES_DRIVE = [
 SPREADSHEET_ID = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
 NOME_ABA = "Imoveis"
 
-# Seu número de WhatsApp configurado com DDI e DDD
-TELEFONE_WHATSAPP = "5512988162626"
+# NÚMEROS DE WHATSAPP DA EQUIPE
+TELEFONE_FERNANDO = "5512988162626"
+TELEFONE_VALDIR = "5512992157474"  # <--- Altere aqui para o número do Valdir quando necessário
 
 
 # =============================================================================
@@ -76,7 +77,7 @@ st.markdown(
         border-radius: 8px;
         width: 100% !important;
         object-fit: cover !important;
-        max-height: 220px !important;
+        height: 220px !important;
         display: block;
     }
 
@@ -166,6 +167,7 @@ st.markdown(
         border: 1px solid #374151;
         width: 100%;
         transition: all 0.2s ease-in-out;
+        font-size: 0.85rem !important;
     }
 
     .stButton > button:hover, .stLinkButton > button:hover {
@@ -391,7 +393,7 @@ else:
                 with st.container():
                     st.markdown('<div class="imovel-card">', unsafe_allow_html=True)
 
-                    # 1. DEFINIÇÃO DO STATUS E CLASSE DO SELO
+                    # 1. STATUS E SELO FLUTUANTE
                     st_normal = normalizar(imovel["status"])
                     if "NEGOCIAÇÃO" in st_normal or "NEGOCIACAO" in st_normal:
                         badge_classe = "status-negociacao"
@@ -403,7 +405,7 @@ else:
                         badge_classe = "status-disponivel"
                         badge_texto = "DISPONÍVEL"
 
-                    # 2. RENDERIZAÇÃO DA FOTO COM O SELO FLUTUANTE DIRETAMENTE EM HTML
+                    # 2. FOTO COM TAMANHO PADRONIZADO
                     foto_bytes = obter_foto_miniatura_por_id(imovel["miniatura_id"])
                     
                     if foto_bytes:
@@ -416,7 +418,7 @@ else:
                         ''', unsafe_allow_html=True)
                     else:
                         st.markdown(f'''
-                            <div class="foto-container-relativo" style="background: #21262d; height: 180px; display: flex; align-items: center; justify-content: center; color: #8b949e; border-radius: 8px;">
+                            <div class="foto-container-relativo" style="background: #21262d; height: 220px; display: flex; align-items: center; justify-content: center; color: #8b949e; border-radius: 8px;">
                                 <span class="status-badge {badge_classe}">{badge_texto}</span>
                                 <span>Miniatura não configurada</span>
                             </div>
@@ -474,21 +476,25 @@ else:
                         unsafe_allow_html=True,
                     )
 
-                    # 8. BOTÕES DE AÇÃO (MATERIAIS + WHATSAPP COM SEU NÚMERO)
-                    col_b1, col_b2 = st.columns(2)
-                    
-                    with col_b1:
-                        if st.button(
-                            "Materiais",
-                            key=f"btn_mat_{imovel['codigo']}_{inicio}_{posicao}",
-                            use_container_width=True,
-                        ):
-                            st.session_state["codigo_materiais"] = imovel["codigo"]
-                            st.switch_page("pages/materiais.py")
+                    # 8. BOTÕES DE AÇÃO: MATERIAIS, WHATSAPP FERNANDO E WHATSAPP VALDIR
+                    if st.button(
+                        "Materiais do Imóvel",
+                        key=f"btn_mat_{imovel['codigo']}_{inicio}_{posicao}",
+                        use_container_width=True,
+                    ):
+                        st.session_state["codigo_materiais"] = imovel["codigo"]
+                        st.switch_page("pages/materiais.py")
 
-                    with col_b2:
-                        msg_whats = f"Olá, tenho interesse no imóvel {imovel['codigo']} ({imovel['tipo']} em {imovel['bairro']}). Poderia me passar mais informações?"
-                        link_w = f"https://wa.me/{TELEFONE_WHATSAPP}?text={urllib.parse.quote(msg_whats)}"
-                        st.link_button("WhatsApp", link_w, use_container_width=True)
+                    col_w1, col_w2 = st.columns(2)
+                    
+                    msg_whats = f"Olá, tenho interesse no imóvel {imovel['codigo']} ({imovel['tipo']} em {imovel['bairro']}). Poderia me passar mais informações?"
+                    
+                    with col_w1:
+                        link_wf = f"https://wa.me/{TELEFONE_FERNANDO}?text={urllib.parse.quote(msg_whats)}"
+                        st.link_button("WPP Fernando", link_wf, use_container_width=True)
+
+                    with col_w2:
+                        link_wv = f"https://wa.me/{TELEFONE_VALDIR}?text={urllib.parse.quote(msg_whats)}"
+                        st.link_button("WPP Valdir", link_wv, use_container_width=True)
 
                     st.markdown("</div>", unsafe_allow_html=True)
