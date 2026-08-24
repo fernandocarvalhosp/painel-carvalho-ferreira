@@ -176,11 +176,19 @@ st.markdown(
         color: #ffffff;
     }
 
-    /* ESTILO PARA OS BOTÕES LADO A LADO DO WHATSAPP COM ÍCONE SVG */
+    /* CHAMADA PARA O WHATSAPP E BOTÕES LADO A LADO SEM SUBLINHADO */
+    .wpp-titulo-secao {
+        font-size: 0.8rem;
+        color: #8b949e;
+        margin-top: 10px;
+        margin-bottom: 6px;
+        text-align: left;
+        font-weight: 600;
+    }
+
     .btn-wpp-container {
         display: flex;
         gap: 8px;
-        margin-top: 8px;
     }
 
     .btn-wpp-custom {
@@ -196,7 +204,7 @@ st.markdown(
         padding: 9px 6px;
         font-size: 0.8rem;
         font-weight: 600;
-        text-decoration: none;
+        text-decoration: none !important;
         transition: all 0.2s ease-in-out;
         text-align: center;
     }
@@ -205,12 +213,12 @@ st.markdown(
         background-color: #374151;
         border-color: #d4af37;
         color: #ffffff !important;
+        text-decoration: none !important;
     }
 
-    .btn-wpp-custom img {
-        width: 16px;
-        height: 16px;
-        display: inline-block;
+    .btn-wpp-custom:visited, .btn-wpp-custom:active {
+        text-decoration: none !important;
+        color: #f7f5ef !important;
     }
 
     @media (max-width: 768px) {
@@ -522,18 +530,19 @@ else:
                         st.session_state["codigo_materiais"] = imovel["codigo"]
                         st.switch_page("pages/materiais.py")
 
-                    # 9. BOTÕES DO WHATSAPP LADO A LADO COM O ÍCONE MENSAGEM.SVG
+                    # 9. TEXTO DE CHAMADA E BOTÕES DE WHATSAPP LADO A LADO SEM SUBLINHADO
                     msg_whats = f"Olá, tenho interesse no imóvel {imovel['codigo']} ({imovel['tipo']} em {imovel['bairro']}). Poderia me passar mais informações?"
                     link_wf = f"https://wa.me/{TELEFONE_FERNANDO}?text={urllib.parse.quote(msg_whats)}"
                     link_wv = f"https://wa.me/{TELEFONE_VALDIR}?text={urllib.parse.quote(msg_whats)}"
 
                     st.markdown(f'''
+                        <div class="wpp-titulo-secao">Fale com um corretor:</div>
                         <div class="btn-wpp-container">
                             <a href="{link_wf}" target="_blank" class="btn-wpp-custom">
-                                <img src="mensagem.svg" alt="Ícone" /> Fernando
+                                Fernando
                             </a>
                             <a href="{link_wv}" target="_blank" class="btn-wpp-custom">
-                                <img src="mensagem.svg" alt="Ícone" /> Valdir
+                                Valdir
                             </a>
                         </div>
                     ''', unsafe_allow_html=True)
