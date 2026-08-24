@@ -1,4 +1,3 @@
-# app.py
 # -*- coding: utf-8 -*-
 
 import io
@@ -346,6 +345,13 @@ def carregar_imoveis_sheets():
                 or ""
             )
 
+            # Captura o ID da miniatura direto da coluna MINIATURA ou FOTO da planilha
+            miniatura_id = (
+                dados.get("MINIATURA")
+                or dados.get("FOTO")
+                or ""
+            )
+
             imoveis.append(
                 {
                     "codigo": codigo,
@@ -354,6 +360,7 @@ def carregar_imoveis_sheets():
                     "cidade": cidade,
                     "valor": valor,
                     "quartos": quartos,
+                    "miniatura_id": miniatura_id.strip(),
                 }
             )
 
@@ -369,154 +376,21 @@ def carregar_imoveis_sheets():
 
 
 # =============================================================================
-# BUSCA DA MINIATURA NO DRIVE
+# BUSCA DA MINIATURA DIRETAMENTE PELO ID DA PLANILHA
 # =============================================================================
 
 @st.cache_data(ttl=600)
-def obter_primeira_foto_drive(codigo):
+def obter_foto_miniatura_por_id(file_id):
+    if not file_id or len(str(file_id).strip()) < 10:
+        return None
 
     try:
-
         drive, _ = conectar_google()
-
-        # -----------------------------------------------------
-        # 1. ENCONTRA A PASTA PRINCIPAL DO IMÓVEL
-        # -----------------------------------------------------
-
-        query_pasta = (
-            f"name contains '{codigo}' "
-            f"and mimeType = "
-            f"'application/vnd.google-apps.folder' "
-            f"and trashed = false"
-        )
-
-        res_pasta = (
-            drive.files()
-            .list(
-                q=query_pasta,
-                pageSize=5,
-                fields="files(id,name)",
-            )
-            .execute()
-        )
-
-        pastas = res_pasta.get(
-            "files",
-            []
-        )
-
-        id_imovel = None
-
-        for pasta in pastas:
-
-            nome_pasta = (
-                pasta["name"]
-                .strip()
-                .upper()
-            )
-
-            codigo_upper = (
-                codigo.upper()
-            )
-
-            if (
-                nome_pasta == codigo_upper
-                or nome_pasta.startswith(
-                    codigo_upper + " "
-                )
-                or nome_pasta.startswith(
-                    codigo_upper + "-"
-                )
-            ):
-
-                id_imovel = pasta["id"]
-
-                break
-
-        if not id_imovel and pastas:
-
-            id_imovel = pastas[0]["id"]
-
-        if not id_imovel:
-
-            return None
-
-
-        # -----------------------------------------------------
-        # 2. ENCONTRA A PASTA MINIATURA
-        # -----------------------------------------------------
-
-        res_sub = (
-            drive.files()
-            .list(
-                q=(
-                    f"'{id_imovel}' in parents "
-                    f"and mimeType = "
-                    f"'application/vnd.google-apps.folder' "
-                    f"and trashed = false"
-                ),
-                fields="files(id,name)",
-            )
-            .execute()
-        )
-
-        subpastas = res_sub.get(
-            "files",
-            []
-        )
-
-        id_miniatura = None
-
-        for sub in subpastas:
-
-            if (
-                "MINIATURA"
-                in sub["name"].upper()
-            ):
-
-                id_miniatura = sub["id"]
-
-                break
-
-        if not id_miniatura:
-
-            return None
-
-
-        # -----------------------------------------------------
-        # 3. PEGA A PRIMEIRA MINIATURA
-        # -----------------------------------------------------
-
-        res_arq = (
-            drive.files()
-            .list(
-                q=(
-                    f"'{id_miniatura}' in parents "
-                    f"and mimeType contains 'image/' "
-                    f"and trashed = false"
-                ),
-                orderBy="name",
-                pageSize=1,
-                fields="files(id)",
-            )
-            .execute()
-        )
-
-        arquivos = res_arq.get(
-            "files",
-            []
-        )
-
-        if not arquivos:
-
-            return None
-
-        file_id = arquivos[0]["id"]
 
         request = (
             drive.files()
             .get_media(
-                fileId=file_id
+                fileId=file_id.strip()
             )
         )
 
@@ -843,12 +717,12 @@ else:
 
 
                     # =====================================================
-                    # MINIATURA
+                    # MINIATURA (Carregada via ID do Google Sheets)
                     # =====================================================
 
                     foto_bytes = (
-                        obter_primeira_foto_drive(
-                            imovel["codigo"]
+                        obter_foto_miniatura_por_id(
+                            imovel["miniatura_id"]
                         )
                     )
 
