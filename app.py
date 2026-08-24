@@ -6,6 +6,7 @@ import streamlit as st
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
+import base64
 
 
 # =============================================================================
@@ -27,9 +28,8 @@ SCOPES_DRIVE = [
 SPREADSHEET_ID = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
 NOME_ABA = "Imoveis"
 
-# >>> 5512988162626 <<<
-# Exemplo para São Paulo (12): "5512999999999"
-TELEFONE_WHATSAPP = "5512999999999"
+# Seu número de WhatsApp configurado com DDI e DDD
+TELEFONE_WHATSAPP = "5512988162626"
 
 
 # =============================================================================
@@ -65,18 +65,25 @@ st.markdown(
         color: #f7f5ef !important;
     }
 
-    /* CONTAINER DA FOTO COM STATUS FLUTUANTE ELEGANTE */
-    .foto-wrapper {
+    /* CONTAINER DA FOTO COM STATUS FLUTUANTE SOBREPOSTO */
+    .foto-container-relativo {
         position: relative;
         width: 100%;
+        margin-bottom: 12px;
+    }
+
+    .foto-container-relativo img {
         border-radius: 8px;
-        overflow: hidden;
+        width: 100% !important;
+        object-fit: cover !important;
+        max-height: 220px !important;
+        display: block;
     }
 
     .status-badge {
         position: absolute;
-        top: 12px;
-        right: 12px;
+        top: 10px;
+        right: 10px;
         padding: 5px 10px;
         border-radius: 6px;
         font-size: 0.7rem;
@@ -87,19 +94,19 @@ st.markdown(
     }
 
     .status-disponivel {
-        background-color: rgba(35, 134, 54, 0.85);
+        background-color: rgba(35, 134, 54, 0.9);
         color: #ffffff;
         border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
     .status-negociacao {
-        background-color: rgba(158, 106, 3, 0.85);
+        background-color: rgba(158, 106, 3, 0.9);
         color: #ffffff;
         border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
     .status-vendido {
-        background-color: rgba(218, 54, 51, 0.85);
+        background-color: rgba(218, 54, 51, 0.9);
         color: #ffffff;
         border: 1px solid rgba(255, 255, 255, 0.2);
     }
@@ -115,13 +122,6 @@ st.markdown(
 
     .imovel-card:hover {
         border-color: #d4af37;
-    }
-
-    [data-testid="stImage"] img {
-        border-radius: 8px;
-        width: 100% !important;
-        object-fit: cover !important;
-        max-height: 220px !important;
     }
 
     .preco-imovel {
@@ -183,11 +183,6 @@ st.markdown(
             width: 100% !important;
             flex: 1 1 100% !important;
             min-width: 100% !important;
-        }
-        [data-testid="stImage"] img {
-            width: 100% !important;
-            max-height: none !important;
-            object-fit: cover !important;
         }
         .imovel-card {
             width: 100%;
@@ -396,7 +391,7 @@ else:
                 with st.container():
                     st.markdown('<div class="imovel-card">', unsafe_allow_html=True)
 
-                    # 1. TRATAMENTO DO STATUS E SELO FLUTUANTE NA FOTO
+                    # 1. DEFINIÇÃO DO STATUS E CLASSE DO SELO
                     st_normal = normalizar(imovel["status"])
                     if "NEGOCIAÇÃO" in st_normal or "NEGOCIACAO" in st_normal:
                         badge_classe = "status-negociacao"
@@ -408,25 +403,26 @@ else:
                         badge_classe = "status-disponivel"
                         badge_texto = "DISPONÍVEL"
 
+                    # 2. RENDERIZAÇÃO DA FOTO COM O SELO FLUTUANTE DIRETAMENTE EM HTML
                     foto_bytes = obter_foto_miniatura_por_id(imovel["miniatura_id"])
                     
                     if foto_bytes:
-                        # Exibe a imagem de forma limpa abaixo da badge absoluta flutuante
+                        encoded_img = base64.b64encode(foto_bytes).decode("utf-8")
                         st.markdown(f'''
-                            <div class="foto-wrapper">
+                            <div class="foto-container-relativo">
                                 <span class="status-badge {badge_classe}">{badge_texto}</span>
+                                <img src="data:image/jpeg;base64,{encoded_img}" />
                             </div>
                         ''', unsafe_allow_html=True)
-                        st.image(foto_bytes, use_container_width=True)
                     else:
                         st.markdown(f'''
-                            <div class="foto-wrapper" style="background: #21262d; height: 180px; display: flex; align-items: center; justify-content: center; color: #8b949e;">
+                            <div class="foto-container-relativo" style="background: #21262d; height: 180px; display: flex; align-items: center; justify-content: center; color: #8b949e; border-radius: 8px;">
                                 <span class="status-badge {badge_classe}">{badge_texto}</span>
-                                Miniatura não configurada
+                                <span>Miniatura não configurada</span>
                             </div>
                         ''', unsafe_allow_html=True)
 
-                    # 2. PREÇO
+                    # 3. PREÇO
                     st.markdown(
                         f'''
                         <div class="preco-imovel">
@@ -436,7 +432,7 @@ else:
                         unsafe_allow_html=True,
                     )
 
-                    # 3. TIPO + DORMITÓRIOS
+                    # 4. TIPO + DORMITÓRIOS
                     dorm_texto = f" • {imovel['quartos']} Dorm." if imovel["quartos"] else ""
                     st.markdown(
                         f'''
@@ -447,7 +443,7 @@ else:
                         unsafe_allow_html=True,
                     )
 
-                    # 4. ÁREA ÚTIL
+                    # 5. ÁREA ÚTIL
                     if imovel["area_util"]:
                         st.markdown(
                             f'''
@@ -458,7 +454,7 @@ else:
                             unsafe_allow_html=True,
                         )
 
-                    # 5. LOCALIZAÇÃO
+                    # 6. LOCALIZAÇÃO
                     st.markdown(
                         f'''
                         <div class="info-sub">
@@ -468,7 +464,7 @@ else:
                         unsafe_allow_html=True,
                     )
 
-                    # 6. CÓDIGO
+                    # 7. CÓDIGO
                     st.markdown(
                         f'''
                         <div class="codigo-tag">
@@ -478,7 +474,7 @@ else:
                         unsafe_allow_html=True,
                     )
 
-                    # 7. BOTÕES DE AÇÃO (MATERIAIS + WHATSAPP)
+                    # 8. BOTÕES DE AÇÃO (MATERIAIS + WHATSAPP COM SEU NÚMERO)
                     col_b1, col_b2 = st.columns(2)
                     
                     with col_b1:
