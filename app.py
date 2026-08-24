@@ -28,9 +28,9 @@ SCOPES_DRIVE = [
 SPREADSHEET_ID = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
 NOME_ABA = "Imoveis"
 
-# NÚMEROS DE WHATSAPP DA EQUIPE
+# NÚMEROS DE WHATSAPP DA EQUIPE CONFIGURADOS
 TELEFONE_FERNANDO = "5512988162626"
-TELEFONE_VALDIR = "5512992157474"  # <--- Altere aqui para o número do Valdir quando necessário
+TELEFONE_VALDIR = "5512992157474"
 
 
 # =============================================================================
@@ -476,7 +476,7 @@ else:
                         unsafe_allow_html=True,
                     )
 
-                    # 8. BOTÕES DE AÇÃO: MATERIAIS, WHATSAPP FERNANDO E WHATSAPP VALDIR
+                    # 8. BOTÕES DE AÇÃO: MATERIAIS + WPP FERNANDO + WPP VALDIR
                     if st.button(
                         "Materiais do Imóvel",
                         key=f"btn_mat_{imovel['codigo']}_{inicio}_{posicao}",
