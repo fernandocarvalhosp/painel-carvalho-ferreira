@@ -159,7 +159,7 @@ st.markdown(
         margin-top: 4px;
     }
 
-    .stButton > button, .stLinkButton > button {
+    .stButton > button {
         border-radius: 8px;
         font-weight: 600;
         background-color: #1f2937;
@@ -170,10 +170,47 @@ st.markdown(
         font-size: 0.85rem !important;
     }
 
-    .stButton > button:hover, .stLinkButton > button:hover {
+    .stButton > button:hover {
         background-color: #374151;
         border-color: #d4af37;
         color: #ffffff;
+    }
+
+    /* ESTILO PARA OS BOTÕES LADO A LADO DO WHATSAPP COM ÍCONE SVG */
+    .btn-wpp-container {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+    .btn-wpp-custom {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        background-color: #1f2937;
+        color: #f7f5ef !important;
+        border: 1px solid #374151;
+        border-radius: 8px;
+        padding: 9px 6px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s ease-in-out;
+        text-align: center;
+    }
+
+    .btn-wpp-custom:hover {
+        background-color: #374151;
+        border-color: #d4af37;
+        color: #ffffff !important;
+    }
+
+    .btn-wpp-custom img {
+        width: 16px;
+        height: 16px;
+        display: inline-block;
     }
 
     @media (max-width: 768px) {
@@ -476,7 +513,7 @@ else:
                         unsafe_allow_html=True,
                     )
 
-                    # 8. BOTÕES DE AÇÃO: MATERIAIS + WPP FERNANDO + WPP VALDIR
+                    # 8. BOTÃO DE MATERIAIS
                     if st.button(
                         "Materiais do Imóvel",
                         key=f"btn_mat_{imovel['codigo']}_{inicio}_{posicao}",
@@ -485,16 +522,20 @@ else:
                         st.session_state["codigo_materiais"] = imovel["codigo"]
                         st.switch_page("pages/materiais.py")
 
-                    col_w1, col_w2 = st.columns(2)
-                    
+                    # 9. BOTÕES DO WHATSAPP LADO A LADO COM O ÍCONE MENSAGEM.SVG
                     msg_whats = f"Olá, tenho interesse no imóvel {imovel['codigo']} ({imovel['tipo']} em {imovel['bairro']}). Poderia me passar mais informações?"
-                    
-                    with col_w1:
-                        link_wf = f"https://wa.me/{TELEFONE_FERNANDO}?text={urllib.parse.quote(msg_whats)}"
-                        st.link_button("WPP Fernando", link_wf, use_container_width=True)
+                    link_wf = f"https://wa.me/{TELEFONE_FERNANDO}?text={urllib.parse.quote(msg_whats)}"
+                    link_wv = f"https://wa.me/{TELEFONE_VALDIR}?text={urllib.parse.quote(msg_whats)}"
 
-                    with col_w2:
-                        link_wv = f"https://wa.me/{TELEFONE_VALDIR}?text={urllib.parse.quote(msg_whats)}"
-                        st.link_button("WPP Valdir", link_wv, use_container_width=True)
+                    st.markdown(f'''
+                        <div class="btn-wpp-container">
+                            <a href="{link_wf}" target="_blank" class="btn-wpp-custom">
+                                <img src="mensagem.svg" alt="Ícone" /> Fernando
+                            </a>
+                            <a href="{link_wv}" target="_blank" class="btn-wpp-custom">
+                                <img src="mensagem.svg" alt="Ícone" /> Valdir
+                            </a>
+                        </div>
+                    ''', unsafe_allow_html=True)
 
                     st.markdown("</div>", unsafe_allow_html=True)
