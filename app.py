@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import io
+import urllib.parse
 import streamlit as st
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -8,7 +9,7 @@ from googleapiclient.http import MediaIoBaseDownload
 
 
 # =============================================================================
-# CONFIGURAÇÕES DA PÁGINA
+# CONFIGURAÇÕES DA PÁGINA E CONTATO
 # =============================================================================
 
 st.set_page_config(
@@ -26,8 +27,9 @@ SCOPES_DRIVE = [
 SPREADSHEET_ID = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
 NOME_ABA = "Imoveis"
 
-# Número de WhatsApp padrão para atendimento (Substitua pelo seu número com DDI e DDD)
-TELEFONE_WHATSAPP = "5511999999999"
+# >>> 5512988162626 <<<
+# Exemplo para São Paulo (12): "5512999999999"
+TELEFONE_WHATSAPP = "5512999999999"
 
 
 # =============================================================================
@@ -63,39 +65,43 @@ st.markdown(
         color: #f7f5ef !important;
     }
 
-    /* CONTAINER DA FOTO COM STATUS FLUTUANTE */
-    .foto-container {
+    /* CONTAINER DA FOTO COM STATUS FLUTUANTE ELEGANTE */
+    .foto-wrapper {
         position: relative;
         width: 100%;
+        border-radius: 8px;
+        overflow: hidden;
     }
 
     .status-badge {
         position: absolute;
-        top: 10px;
-        right: 10px;
-        padding: 4px 10px;
+        top: 12px;
+        right: 12px;
+        padding: 5px 10px;
         border-radius: 6px;
-        font-size: 0.75rem;
+        font-size: 0.7rem;
         font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        z-index: 2;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        letter-spacing: 0.8px;
+        z-index: 10;
+        backdrop-filter: blur(4px);
     }
 
     .status-disponivel {
-        background-color: #238636;
+        background-color: rgba(35, 134, 54, 0.85);
         color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
     .status-negociacao {
-        background-color: #9e6a03;
+        background-color: rgba(158, 106, 3, 0.85);
         color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
     .status-vendido {
-        background-color: #da3633;
+        background-color: rgba(218, 54, 51, 0.85);
         color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
     .imovel-card {
@@ -140,7 +146,7 @@ st.markdown(
     }
 
     .codigo-tag {
-        font-size: 0.85rem;
+        font-size: 0.8rem;
         font-weight: 600;
         color: #8b949e;
         background: #1a1f2c;
@@ -166,18 +172,6 @@ st.markdown(
         background-color: #374151;
         border-color: #d4af37;
         color: #ffffff;
-    }
-
-    .btn-whatsapp {
-        background-color: #1b4332 !important;
-        border-color: #2d6a4f !important;
-        color: #52b788 !important;
-    }
-
-    .btn-whatsapp:hover {
-        background-color: #2d6a4f !important;
-        border-color: #52b788 !important;
-        color: #ffffff !important;
     }
 
     @media (max-width: 768px) {
@@ -402,35 +396,35 @@ else:
                 with st.container():
                     st.markdown('<div class="imovel-card">', unsafe_allow_html=True)
 
-                    # 1. FOTO COM SELO DE STATUS FLUTUANTE
-                    foto_bytes = obter_foto_miniatura_por_id(imovel["miniatura_id"])
-                    
+                    # 1. TRATAMENTO DO STATUS E SELO FLUTUANTE NA FOTO
                     st_normal = normalizar(imovel["status"])
                     if "NEGOCIAÇÃO" in st_normal or "NEGOCIACAO" in st_normal:
                         badge_classe = "status-negociacao"
-                        badge_texto = "Em Negociação"
+                        badge_texto = "EM NEGOCIAÇÃO"
                     elif "VENDIDO" in st_normal or "LOCADO" in st_normal or "INDISPONÍVEL" in st_normal or "INDISPONIVEL" in st_normal:
                         badge_classe = "status-vendido"
-                        badge_texto = imovel["status"]
+                        badge_texto = imovel["status"].upper()
                     else:
                         badge_classe = "status-disponivel"
-                        badge_texto = "Disponível"
+                        badge_texto = "DISPONÍVEL"
 
+                    foto_bytes = obter_foto_miniatura_por_id(imovel["miniatura_id"])
+                    
                     if foto_bytes:
-                        # Exibição customizada com o badge flutuante de status
+                        # Exibe a imagem de forma limpa abaixo da badge absoluta flutuante
                         st.markdown(f'''
-                            <div class="foto-container">
+                            <div class="foto-wrapper">
                                 <span class="status-badge {badge_classe}">{badge_texto}</span>
                             </div>
                         ''', unsafe_allow_html=True)
                         st.image(foto_bytes, use_container_width=True)
                     else:
                         st.markdown(f'''
-                            <div style="position: relative;">
+                            <div class="foto-wrapper" style="background: #21262d; height: 180px; display: flex; align-items: center; justify-content: center; color: #8b949e;">
                                 <span class="status-badge {badge_classe}">{badge_texto}</span>
+                                Miniatura não configurada
                             </div>
                         ''', unsafe_allow_html=True)
-                        st.markdown("Miniatura não configurada")
 
                     # 2. PREÇO
                     st.markdown(
@@ -498,10 +492,6 @@ else:
 
                     with col_b2:
                         msg_whats = f"Olá, tenho interesse no imóvel {imovel['codigo']} ({imovel['tipo']} em {imovel['bairro']}). Poderia me passar mais informações?"
-                        link_whats = f"https://wa.me/{TELEFONE_WHATSAPP}?text={urllib.parse.quote(msg_whats)}" if 'urllib' in globals() else f"https://wa.me/{TELEFONE_WHATSAPP}"
-                        
-                        # Botão de redirecionamento direto para o WhatsApp do imóvel
-                        import urllib.parse
                         link_w = f"https://wa.me/{TELEFONE_WHATSAPP}?text={urllib.parse.quote(msg_whats)}"
                         st.link_button("WhatsApp", link_w, use_container_width=True)
 
