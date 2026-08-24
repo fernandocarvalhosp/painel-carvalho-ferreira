@@ -536,7 +536,7 @@ else:
                     link_wv = f"https://wa.me/{TELEFONE_VALDIR}?text={urllib.parse.quote(msg_whats)}"
 
                     st.markdown(f'''
-                        <div class="wpp-titulo-secao">Fale com um corretor:</div>
+                        <div class="wpp-titulo-secao">Converse no WhatsApp com:</div>
                         <div class="btn-wpp-container">
                             <a href="{link_wf}" target="_blank" class="btn-wpp-custom">
                                 Fernando
