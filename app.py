@@ -307,7 +307,7 @@ def carregar_imoveis_sheets():
             cidade = dados.get("CIDADE") or ""
             valor = dados.get("VALOR") or "Sob consulta"
             quartos = dados.get("QUARTOS") or dados.get("DORMS") or dados.get("DORMITORIOS") or ""
-            area_util = dados.get("") or dados.get("ÁREA ÚTIL") or ""
+            area_util = dados.get("AREA UTIL") or dados.get("ÁREA ÚTIL") or ""
             status = dados.get("STATUS") or "Disponível"
             miniatura_id = dados.get("MINIATURA") or dados.get("FOTO") or ""
 
@@ -495,7 +495,7 @@ else:
                         st.markdown(
                             f'''
                             <div class="info-sub">
-                                Área: {imovel["area_util"]} Área Útil
+                                Área: {imovel["area_util"]} úteis
                             </div>
                             ''',
                             unsafe_allow_html=True,
@@ -536,7 +536,7 @@ else:
                     link_wv = f"https://wa.me/{TELEFONE_VALDIR}?text={urllib.parse.quote(msg_whats)}"
 
                     st.markdown(f'''
-                        <div class="wpp-titulo-secao">Converse no WhatsApp com:</div>
+                        <div class="wpp-titulo-secao">Fale com um corretor:</div>
                         <div class="btn-wpp-container">
                             <a href="{link_wf}" target="_blank" class="btn-wpp-custom">
                                 Fernando
