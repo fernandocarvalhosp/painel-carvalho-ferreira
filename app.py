@@ -495,7 +495,7 @@ else:
                         st.markdown(
                             f'''
                             <div class="info-sub">
-                                Área: {imovel["area_util"]} úteis
+                                Área: {imovel["area_util"]} Área Útil
                             </div>
                             ''',
                             unsafe_allow_html=True,
