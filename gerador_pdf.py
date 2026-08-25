@@ -259,7 +259,7 @@ HTML_LAYOUT = """
         .logo-subtitle { font-size: 8pt; letter-spacing: 1.8px; color: #94a3b8; margin-top: 6px; text-transform: uppercase; }
         .header-info { width: 100%; margin-top: 4px; }
         .tipo-imovel { font-family: 'Cormorant Garamond', serif; width: 100%; font-size: 16pt; font-weight: 500; letter-spacing: 1.3px; color: #94a3b8; margin: 0; line-height: 1; }
-        .destaque-imovel { font-family: 'Cormorant Garamond', serif; width: 100%; font-size: 21pt; font-weight: 600; letter-spacing: 1.1px; margin-top: 3px; margin: 0; color: #F7F5F0; line-height: 1; overflow-wrap: anywhere; }
+        .destaque-imovel { font-family: 'Cormorant Garamond', serif; width: 100%; font-size: 22pt; font-weight: 600; letter-spacing: 1.1px; margin-top: 3px; margin: 0; color: #F7F5F0; line-height: 1; overflow-wrap: anywhere; }
         .nome-imovel { width: 100%; font-size: 13pt; color: #F7F5F0; font-weight: 300; margin-top: 8px; letter-spacing: 0.8px; overflow-wrap: anywhere; }
         .valor-imovel { position: absolute; top: 400px; left: 18%; width: 60%; z-index: 100; font-size: 24pt;font-weight: 600; color: #F7F5F0; letter-spacing: 0.8px; text-align: center; white-space: nowrap; }
         .location-container { width: 100%; display: flex; align-items: flex-end; position: fixed; top: 580px; left: 45px; }
