@@ -32,7 +32,7 @@ PASTA_FONTES = PASTA_MARCA / "fontes"
 
 
 def conectar_google():
-    """Autentica via st.secrets['google_credentials']."""
+    """Autentica via st.secrets['google_credentials'].""" 
     try:
         import streamlit as st
 
@@ -204,12 +204,54 @@ def ler_dados_sheets(sheets, codigo_imovel):
         return {}
 
 
-def get_dado(dados, *chaves, default="-"):
+def get_dado(dados, *chaves, default=""):
+    """Retorna o primeiro valor preenchido. Sem informação, retorna vazio."""
     for chave in chaves:
         valor = dados.get(normalizar(chave), "")
         if valor not in ("", None):
             return valor
     return default
+
+
+def valor_preenchido(valor):
+    """
+    True quando existe uma informação que realmente deve aparecer.
+    Valores como '-', 'n/a' e 'não informado' são tratados como vazios.
+    """
+    if valor in ("", None):
+        return False
+
+    texto = str(valor).strip().lower()
+
+    valores_vazios = {
+        "-",
+        "—",
+        "n/a",
+        "na",
+        "não informado",
+        "nao informado",
+        "não informado.",
+        "nao informado.",
+    }
+
+    return texto not in valores_vazios
+
+
+def valor_positivo(valor):
+    """
+    Para características numéricas.
+    Zero não aparece em itens como suítes, dormitórios, banheiros e vagas.
+    """
+    if not valor_preenchido(valor):
+        return False
+
+    texto = str(valor).strip().replace(",", ".")
+
+    try:
+        return float(texto) > 0
+    except ValueError:
+        # Se não for puramente numérico, mantém a informação.
+        return True
 
 
 HTML_LAYOUT = """
@@ -279,7 +321,7 @@ HTML_LAYOUT = """
         .diferencial-destaque { font-size: 10pt; font-weight: 600; color: #06192a; letter-spacing: 1.1px; text-transform: uppercase; margin-bottom: 10px; display: block; line-height: 1.25; }
         .description { font-size: 10pt; line-height: 1.45; color: #2d3748; font-weight: 400; }
         .features-grid { width: 100%; display: flex; justify-content: space-between; align-items: flex-start; padding: 5px 6px 0 6px; }
-        .feature-item { width: 25%; min-width: 0; text-align: center; display: flex; flex-direction: column; align-items: center; }
+        .feature-item { flex: 1; min-width: 0; text-align: center; display: flex; flex-direction: column; align-items: center; }
         .feature-icon-box { width: 28px; height: 28px; margin-bottom: 7px; flex-shrink: 0; }
         .feature-icon-box svg { width: 100%; height: 100%; }
         .feature-value { font-size: 14pt; font-weight: bold; color: #06192a; line-height: 1; min-height: 14pt; }
@@ -320,31 +362,25 @@ HTML_LAYOUT = """
                 </div>
             </div>
         </div>
+
+        {% if specs %}
         <div class="specs-card">
-            <div class="spec-row">
-                <div class="spec-icon-box">{{ svg_campo1 | safe }}</div>
-                <div class="spec-text-box">
-                    <span class="spec-label">{{ label_campo1 }}</span>
-                    <span class="spec-value">{{ valor_campo1 }}</span>
+            {% for spec in specs %}
+                <div class="spec-row">
+                    <div class="spec-icon-box">{{ spec.svg | safe }}</div>
+                    <div class="spec-text-box">
+                        <span class="spec-label">{{ spec.label }}</span>
+                        <span class="spec-value">{{ spec.valor }}</span>
+                    </div>
                 </div>
-            </div>
-            <div class="spec-divider"></div>
-            <div class="spec-row">
-                <div class="spec-icon-box">{{ svg_campo2 | safe }}</div>
-                <div class="spec-text-box">
-                    <span class="spec-label">{{ label_campo2 }}</span>
-                    <span class="spec-value">{{ valor_campo2 }}</span>
-                </div>
-            </div>
-            <div class="spec-divider"></div>
-            <div class="spec-row">
-                <div class="spec-icon-box">{{ svg_campo3 | safe }}</div>
-                <div class="spec-text-box">
-                    <span class="spec-label">{{ label_campo3 }}</span>
-                    <span class="spec-value">{{ valor_campo3 }}</span>
-                </div>
-            </div>
+
+                {% if not loop.last %}
+                    <div class="spec-divider"></div>
+                {% endif %}
+            {% endfor %}
         </div>
+        {% endif %}
+
         <div class="details-area">
             <div class="description-wrapper">
                 {% if observacao and observacao != '-' %}
@@ -352,29 +388,20 @@ HTML_LAYOUT = """
                 {% endif %}
                 <div class="description">{{ descricao }}</div>
             </div>
+
+            {% if features %}
             <div class="features-grid">
-                <div class="feature-item">
-                    <div class="feature-icon-box">{{ svg_dormitorios | safe }}</div>
-                    <div class="feature-value">{{ dormitorios }}</div>
-                    <div class="feature-label">Dormitorios</div>
-                </div>
-                <div class="feature-item">
-                    <div class="feature-icon-box">{{ svg_suites | safe }}</div>
-                    <div class="feature-value">{{ suites }}</div>
-                    <div class="feature-label">Suites</div>
-                </div>
-                <div class="feature-item">
-                    <div class="feature-icon-box">{{ svg_banheiros | safe }}</div>
-                    <div class="feature-value">{{ banheiros }}</div>
-                    <div class="feature-label">Banheiros</div>
-                </div>
-                <div class="feature-item">
-                    <div class="feature-icon-box">{{ svg_vagas | safe }}</div>
-                    <div class="feature-value">{{ vagas }}</div>
-                    <div class="feature-label">Vagas</div>
-                </div>
+                {% for feature in features %}
+                    <div class="feature-item">
+                        <div class="feature-icon-box">{{ feature.svg | safe }}</div>
+                        <div class="feature-value">{{ feature.valor }}</div>
+                        <div class="feature-label">{{ feature.label }}</div>
+                    </div>
+                {% endfor %}
             </div>
+            {% endif %}
         </div>
+
         <div class="footer-line"></div>
         <div class="footer-content">
             <div>
@@ -386,6 +413,7 @@ HTML_LAYOUT = """
             </div>
         </div>
     </div>
+
     {% for foto in fotos_galeria %}
     <div class="page-break">
         <img class="full-photo" src="{{ foto }}" alt="Foto">
@@ -506,6 +534,66 @@ def gerar_pdf(codigo_imovel):
             "iptu.svg",
         )
 
+    # Monta somente os campos laterais que realmente possuem informação.
+    specs = []
+
+    if valor_preenchido(valor_campo1):
+        specs.append({
+            "label": label_campo1,
+            "valor": valor_campo1,
+            "svg": carregar_icone_local(icone_campo1, "#f4f1ea"),
+        })
+
+    if valor_preenchido(valor_campo2):
+        specs.append({
+            "label": label_campo2,
+            "valor": valor_campo2,
+            "svg": carregar_icone_local(icone_campo2, "#f4f1ea"),
+        })
+
+    if valor_preenchido(valor_campo3):
+        specs.append({
+            "label": label_campo3,
+            "valor": valor_campo3,
+            "svg": carregar_icone_local(icone_campo3, "#f4f1ea"),
+        })
+
+    # Monta somente as características com quantidade positiva.
+    dormitorios = get_dado(dados, "DORMITORIOS")
+    suites = get_dado(dados, "SUITES")
+    banheiros = get_dado(dados, "BANHEIROS")
+    vagas = get_dado(dados, "VAGAS")
+
+    features = []
+
+    if valor_positivo(dormitorios):
+        features.append({
+            "valor": dormitorios,
+            "label": "Dormitorios",
+            "svg": carregar_icone_local("dormitorios.svg", "#06192a"),
+        })
+
+    if valor_positivo(suites):
+        features.append({
+            "valor": suites,
+            "label": "Suites",
+            "svg": carregar_icone_local("suites.svg", "#06192a"),
+        })
+
+    if valor_positivo(banheiros):
+        features.append({
+            "valor": banheiros,
+            "label": "Banheiros",
+            "svg": carregar_icone_local("banheiros.svg", "#06192a"),
+        })
+
+    if valor_positivo(vagas):
+        features.append({
+            "valor": vagas,
+            "label": "Vagas",
+            "svg": carregar_icone_local("vagas.svg", "#06192a"),
+        })
+
     html_rendered = Template(HTML_LAYOUT).render(
         foto_capa=foto_capa,
         fotos_galeria=fotos_galeria,
@@ -520,31 +608,19 @@ def gerar_pdf(codigo_imovel):
         fonte_manrope_medium=fonte_local("MANROPE", "Manrope-Medium.ttf"),
         fonte_manrope_semibold=fonte_local("MANROPE", "Manrope-SemiBold.ttf"),
         svg_localizacao=carregar_icone_local("localizacao.svg", "#f4f1ea"),
-        svg_dormitorios=carregar_icone_local("dormitorios.svg", "#06192a"),
-        svg_suites=carregar_icone_local("suites.svg", "#06192a"),
-        svg_banheiros=carregar_icone_local("banheiros.svg", "#06192a"),
-        svg_vagas=carregar_icone_local("vagas.svg", "#06192a"),
-        svg_campo1=carregar_icone_local(icone_campo1, "#f4f1ea"),
-        svg_campo2=carregar_icone_local(icone_campo2, "#f4f1ea"),
-        svg_campo3=carregar_icone_local(icone_campo3, "#f4f1ea"),
-        label_campo1=label_campo1,
-        valor_campo1=valor_campo1,
-        label_campo2=label_campo2,
-        valor_campo2=valor_campo2,
-        label_campo3=label_campo3,
-        valor_campo3=valor_campo3,
-        titulo_1=get_dado(dados, "TITULO 1", default=""),
-        titulo_2=get_dado(dados, "TITULO 2", default=""),
-        titulo_3=get_dado(dados, "TITULO 3", default=""),
+
+        specs=specs,
+        features=features,
+
+        titulo_1=get_dado(dados, "TITULO 1"),
+        titulo_2=get_dado(dados, "TITULO 2"),
+        titulo_3=get_dado(dados, "TITULO 3"),
         valor=get_dado(dados, "VALOR"),
-        bairro=get_dado(dados, "BAIRRO", default=""),
-        cidade_uf=get_dado(dados, "CIDADE", default=""),
-        observacao=get_dado(dados, "OBS EXTRAS", default=""),
-        descricao=get_dado(dados, "DESCRICAO", default=""),
-        dormitorios=get_dado(dados, "DORMITORIOS"),
-        suites=get_dado(dados, "SUITES", default="-"),
-        banheiros=get_dado(dados, "BANHEIROS"),
-        vagas=get_dado(dados, "VAGAS"),
+        bairro=get_dado(dados, "BAIRRO"),
+        cidade_uf=get_dado(dados, "CIDADE"),
+        observacao=get_dado(dados, "OBS EXTRAS"),
+        descricao=get_dado(dados, "DESCRICAO"),
+
     )
 
     pdf_buffer = io.BytesIO()
