@@ -250,7 +250,6 @@ def valor_positivo(valor):
     try:
         return float(texto) > 0
     except ValueError:
-        # Se não for puramente numérico, mantém a informação.
         return True
 
 
@@ -308,13 +307,13 @@ HTML_LAYOUT = """
         .location-icon-box { width: 35px; height: 35px; margin-right: 8px; flex-shrink: 0; margin-top: 1px; }
         .location-icon-box svg { width: 100%; height: 100%; }
         .localizacao-topo { min-width: 0; font-size: 8.5pt; letter-spacing: 0.8px; color: #94a3b8; text-transform: uppercase; line-height: 1.4; overflow-wrap: anywhere; }
-        .specs-card { position: absolute; top: 56.5%; left: 5.5%; width: 33.5%; height: 35.5%; background: #06192a; border: 1px solid #1e2d3d; border-radius: 2px; padding: 24px 18px; color: white; box-shadow: -4px -4px 14px rgba(0, 0, 0, 0.18); z-index: 10; display: flex; flex-direction: column; justify-content: space-around; }
+        .specs-card { position: absolute; top: 56.5%; left: 5.5%; width: 33.5%; height: 35.5%; background: #06192a; border: 1px solid #1e2d3d; border-radius: 2px; padding: 20px 18px; color: white; box-shadow: -4px -4px 14px rgba(0, 0, 0, 0.18); z-index: 10; display: flex; flex-direction: column; justify-content: space-around; }
         .spec-row { display: flex; align-items: center; min-width: 0; width: 100%; }
         .spec-icon-box { width: 32px; height: 32px; margin-right: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-        .spec-icon-box svg { width: 25px !important; height: 25px !important; }
+        .spec-icon-box svg { width: 22px !important; height: 22px !important; }
         .spec-text-box { min-width: 0; display: flex; flex-direction: column; }
-        .spec-label { font-size: 10pt; letter-spacing: 1px; color: #94a3b8; text-transform: uppercase; font-weight: 500; line-height: 1.15; }
-        .spec-value { font-size: 13.5pt; font-weight: 400; margin-top: 3px; color: #ffffff; letter-spacing: 0.3px; line-height: 1.1; overflow-wrap: anywhere; }
+        .spec-label { font-size: 9pt; letter-spacing: 1px; color: #94a3b8; text-transform: uppercase; font-weight: 500; line-height: 1.15; }
+        .spec-value { font-size: 12pt; font-weight: 400; margin-top: 2px; color: #ffffff; letter-spacing: 0.3px; line-height: 1.1; overflow-wrap: anywhere; }
         .spec-divider { height: 1px; background: #1a2b3c; width: 100%; flex-shrink: 0; }
         .details-area { position: absolute; top: 62%; right: 0; width: 62%; height: 31%; padding: 20px 40px 10px 45px; z-index: 2; display: flex; flex-direction: column; justify-content: space-between; }
         .description-wrapper { border-left: 2px solid #06192a; padding-left: 16px; margin-top: 5px; }
@@ -501,61 +500,51 @@ def gerar_pdf(codigo_imovel):
     tipo_imovel = get_dado(dados, "TIPO", default="IMOVEL")
     tipo_lower = tipo_imovel.lower()
 
-    if "apartamento" in tipo_lower:
-        label_campo1, valor_campo1, icone_campo1 = (
-            "Area Util",
-            get_dado(dados, "AREA UTIL"),
-            "area.svg",
-        )
-        label_campo2, valor_campo2, icone_campo2 = (
-            "Andar",
-            get_dado(dados, "ANDAR"),
-            "andar.svg",
-        )
-        label_campo3, valor_campo3, icone_campo3 = (
-            "IPTU",
-            get_dado(dados, "IPTU"),
-            "iptu.svg",
-        )
-    else:
-        label_campo1, valor_campo1, icone_campo1 = (
-            "Area Util",
-            get_dado(dados, "AREA UTIL"),
-            "area.svg",
-        )
-        label_campo2, valor_campo2, icone_campo2 = (
-            "Area do Terreno",
-            get_dado(dados, "AREA TOTAL"),
-            "terreno.svg",
-        )
-        label_campo3, valor_campo3, icone_campo3 = (
-            "IPTU",
-            get_dado(dados, "IPTU"),
-            "iptu.svg",
-        )
+    # Captura os dados básicos
+    area_util = get_dado(dados, "AREA UTIL")
+    area_total = get_dado(dados, "AREA TOTAL")
+    andar = get_dado(dados, "ANDAR")
+    iptu = get_dado(dados, "IPTU")
+    condominio = get_dado(dados, "CONDOMINIO")
 
-    # Monta somente os campos laterais que realmente possuem informação.
+    # Define a estrutura dinâmica dos cards laterais com base no tipo de imóvel e dados preenchidos
     specs = []
 
-    if valor_preenchido(valor_campo1):
+    if valor_preenchido(area_util):
         specs.append({
-            "label": label_campo1,
-            "valor": valor_campo1,
-            "svg": carregar_icone_local(icone_campo1, "#f4f1ea"),
+            "label": "Area Util",
+            "valor": area_util,
+            "svg": carregar_icone_local("area.svg", "#f4f1ea"),
         })
 
-    if valor_preenchido(valor_campo2):
+    if "apartamento" in tipo_lower:
+        if valor_preenchido(andar):
+            specs.append({
+                "label": "Andar",
+                "valor": andar,
+                "svg": carregar_icone_local("andar.svg", "#f4f1ea"),
+            })
+    else:
+        if valor_preenchido(area_total):
+            specs.append({
+                "label": "Area do Terreno",
+                "valor": area_total,
+                "svg": carregar_icone_local("terreno.svg", "#f4f1ea"),
+            })
+
+    if valor_preenchido(iptu):
         specs.append({
-            "label": label_campo2,
-            "valor": valor_campo2,
-            "svg": carregar_icone_local(icone_campo2, "#f4f1ea"),
+            "label": "IPTU",
+            "valor": iptu,
+            "svg": carregar_icone_local("iptu.svg", "#f4f1ea"),
         })
 
-    if valor_preenchido(valor_campo3):
+    # Adiciona o condomínio automaticamente se houver valor preenchido
+    if valor_preenchido(condominio):
         specs.append({
-            "label": label_campo3,
-            "valor": valor_campo3,
-            "svg": carregar_icone_local(icone_campo3, "#f4f1ea"),
+            "label": "Condomínio",
+            "valor": condominio,
+            "svg": carregar_icone_local("condominio.svg", "#f4f1ea"), # Caso não tenha o icone dedicado, ele se adapta de forma fluida
         })
 
     # Monta somente as características com quantidade positiva.
@@ -620,7 +609,6 @@ def gerar_pdf(codigo_imovel):
         cidade_uf=get_dado(dados, "CIDADE"),
         observacao=get_dado(dados, "OBS EXTRAS"),
         descricao=get_dado(dados, "DESCRICAO"),
-
     )
 
     pdf_buffer = io.BytesIO()
