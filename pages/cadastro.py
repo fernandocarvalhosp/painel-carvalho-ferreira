@@ -1,4 +1,3 @@
-# cadastro.py
 # -*- coding: utf-8 -*-
 
 import sys
@@ -177,6 +176,7 @@ def carregar_dados_na_interface(dados):
         "f_area_total": "AREA TOTAL",
         "f_andar": "ANDAR",
         "f_iptu": "IPTU",
+        "f_condominio": "CONDOMINIO",
         "f_dormitorios": "DORMITORIOS",
         "f_banheiros": "BANHEIROS",
         "f_suites": "SUITES",
@@ -447,6 +447,7 @@ with tab2:
         novo_area_total = st.text_input("Area Total", key="f_area_total")
         novo_andar = st.text_input("Andar", key="f_andar")
         novo_iptu = st.text_input("IPTU", key="f_iptu")
+        novo_condominio = st.text_input("Condomínio", key="f_condominio")
     with col_e:
         novo_dormitorios = st.text_input("Dormitorios", key="f_dormitorios")
         novo_banheiros = st.text_input("Banheiros", key="f_banheiros")
@@ -497,6 +498,7 @@ if st.button("Salvar atualizacoes", type="primary", use_container_width=True, ke
             novo_area_total,
             novo_andar,
             novo_iptu,
+            novo_condominio,
             novo_titulo_1,
             novo_titulo_2,
             novo_titulo_3,
