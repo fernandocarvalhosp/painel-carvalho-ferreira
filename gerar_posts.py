@@ -315,7 +315,6 @@ def fonte_uri(
     if not dados:
         return ""
 
-    # WeasyPrint aceita data URI.
     import base64
 
     encoded = base64.b64encode(
@@ -875,6 +874,12 @@ def gerar_lamina_capa(
         foto["nome"],
     )
 
+    condominio_html = (
+        f"<div class='condominio-texto'>Condomínio: {ctx['condominio']}</div>"
+        if ctx["condominio"] and ctx["condominio"] != "-"
+        else ""
+    )
+
     html = f"""
     <html>
     <head>
@@ -965,6 +970,15 @@ def gerar_lamina_capa(
         color: {COR_OFF_WHITE};
     }}
 
+    .condominio-texto {{
+        margin-top: 4px;
+        font-size: 16px;
+        color: {COR_AZUL_SUAVE};
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }}
+
     .linha {{
         width: 100%;
         height: 1px;
@@ -1030,6 +1044,8 @@ def gerar_lamina_capa(
                 <div class="valor">
                     {ctx['valor']}
                 </div>
+
+                {condominio_html}
 
                 <div class="linha"></div>
 
@@ -1284,9 +1300,9 @@ def gerar_lamina_ficha(
             </div>
 
             <div class="card">
-                <div class="icone">{ctx['svg_terreno']}</div>
-                <div class="label">Area do terreno</div>
-                <div class="valor">{ctx['terreno']}</div>
+                <div class="icone">{ctx['svg_condominio']}</div>
+                <div class="label">Condominio</div>
+                <div class="valor">{ctx['condominio']}</div>
             </div>
 
         </div>
@@ -1449,6 +1465,12 @@ def gerar_thumbnail(
         foto["nome"],
     )
 
+    condominio_html = (
+        f"<div class='condominio-texto'>Condomínio: {ctx['condominio']}</div>"
+        if ctx["condominio"] and ctx["condominio"] != "-"
+        else ""
+    )
+
     html = f"""
     <html>
     <head>
@@ -1537,9 +1559,18 @@ def gerar_thumbnail(
         color: {COR_OFF_WHITE};
     }}
 
+    .condominio-texto {{
+        margin-top: 3px;
+        font-size: 15px;
+        color: {COR_AZUL_SUAVE};
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }}
+
     .marca {{
-        margin-top: 24px;
-        padding-top: 16px;
+        margin-top: 20px;
+        padding-top: 14px;
         border-top: 1px solid rgba(255,255,255,.3);
         font-size: 13px;
         letter-spacing: 2px;
@@ -1588,6 +1619,8 @@ def gerar_thumbnail(
                     {ctx['valor']}
                 </div>
 
+                {condominio_html}
+
                 <div class="marca">
                     CARVALHO FERREIRA
                 </div>
@@ -1632,6 +1665,12 @@ def gerar_stories(
         foto_uri = imagem_uri(
             foto["bytes"],
             foto["nome"],
+        )
+
+        condominio_story_html = (
+            f"<div>Cond. {ctx['condominio']}</div>"
+            if ctx["condominio"] and ctx["condominio"] != "-"
+            else ""
         )
 
         html = f"""
@@ -1812,6 +1851,8 @@ def gerar_stories(
                         {ctx['area']} const.
                     </div>
 
+                    {condominio_story_html}
+
                 </div>
 
                 <div class="marca">
@@ -1941,6 +1982,13 @@ def gerar_posts(
                 "VALOR",
             ),
 
+        "condominio":
+            get_dado(
+                dados,
+                "CONDOMINIO",
+                default="",
+            ),
+
         "bairro":
             get_dado(
                 dados,
@@ -2027,10 +2075,10 @@ def gerar_posts(
                 COR_OFF_WHITE,
             ),
 
-        "svg_terreno":
+        "svg_condominio":
             carregar_icone_bytes(
                 drive,
-                "terreno.svg",
+                "condominio.svg",
                 COR_OFF_WHITE,
             ),
     }
