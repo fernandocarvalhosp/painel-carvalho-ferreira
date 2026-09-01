@@ -315,11 +315,15 @@ HTML_LAYOUT = """
         .spec-label { font-size: 9pt; letter-spacing: 1px; color: #94a3b8; text-transform: uppercase; font-weight: 500; line-height: 1.15; }
         .spec-value { font-size: 12pt; font-weight: 400; margin-top: 2px; color: #ffffff; letter-spacing: 0.3px; line-height: 1.1; overflow-wrap: anywhere; }
         .spec-divider { height: 1px; background: #1a2b3c; width: 100%; flex-shrink: 0; }
-        .details-area { position: absolute; top: 62%; right: 0; width: 62%; height: 31%; padding: 20px 40px 10px 45px; z-index: 2; display: flex; flex-direction: column; justify-content: space-between; }
-        .description-wrapper { border-left: 2px solid #06192a; padding-left: 16px; margin-top: 5px; }
-        .diferencial-destaque { font-size: 10pt; font-weight: 600; color: #06192a; letter-spacing: 1.1px; text-transform: uppercase; margin-bottom: 10px; display: block; line-height: 1.25; }
-        .description { font-size: 10pt; line-height: 1.45; color: #2d3748; font-weight: 400; }
-        .features-grid { width: 100%; display: flex; justify-content: space-between; align-items: flex-start; padding: 5px 6px 0 6px; }
+        
+        /* Ajustado para altura dinâmica, evitando o corte do texto */
+        .details-area { position: absolute; top: 61%; right: 0; width: 62%; padding: 15px 40px 10px 45px; z-index: 2; display: flex; flex-direction: column; }
+        .description-wrapper { border-left: 2px solid #06192a; padding-left: 16px; margin-bottom: 12px; }
+        
+        .diferencial-destaque { font-size: 10pt; font-weight: 600; color: #06192a; letter-spacing: 1.1px; text-transform: uppercase; margin-bottom: 8px; display: block; line-height: 1.25; }
+        .description { font-size: 9.5pt; line-height: 1.4; color: #2d3748; font-weight: 400; }
+        
+        .features-grid { width: 100%; display: flex; justify-content: space-between; align-items: flex-start; padding: 5px 6px 0 6px; margin-top: 15px; }
         .feature-item { flex: 1; min-width: 0; text-align: center; display: flex; flex-direction: column; align-items: center; }
         .feature-icon-box { width: 28px; height: 28px; margin-bottom: 7px; flex-shrink: 0; }
         .feature-icon-box svg { width: 100%; height: 100%; }
@@ -544,7 +548,7 @@ def gerar_pdf(codigo_imovel):
         specs.append({
             "label": "Condomínio",
             "valor": condominio,
-            "svg": carregar_icone_local("condominio.svg", "#f4f1ea"), # Caso não tenha o icone dedicado, ele se adapta de forma fluida
+            "svg": carregar_icone_local("condominio.svg", "#f4f1ea"),
         })
 
     # Monta somente as características com quantidade positiva.
