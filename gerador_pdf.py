@@ -184,7 +184,7 @@ def ler_dados_sheets(sheets, codigo_imovel):
     try:
         result = sheets.spreadsheets().values().get(
             spreadsheetId=SPREADSHEET_ID,
-            range=f"'{NOME_ABA}'!A:Z",
+            range=f"'{NOME_ABA}'!A:AC",
         ).execute()
         rows = result.get("values", [])
         if not rows:
