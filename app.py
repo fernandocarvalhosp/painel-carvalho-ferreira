@@ -8,9 +8,6 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 import base64
 
-# MÓDULO GERADOR DE DOSSIÊ DOCUMENTAL
-import gerador_dossie
-
 
 # =============================================================================
 # CONFIGURAÇÕES DA PÁGINA E CONTATOS
@@ -374,13 +371,8 @@ if not lista_imoveis:
 
 st.sidebar.markdown("### Navegação")
 
-col_nav1, col_nav2 = st.sidebar.columns(2)
-with col_nav1:
-    if st.button("📁 Materiais", use_container_width=True):
-        st.switch_page("pages/materiais.py")
-with col_nav2:
-    if st.button("⚙️ Cadastro", use_container_width=True):
-        st.switch_page("pages/cadastro.py")
+if st.sidebar.button("Ir para Cadastro", use_container_width=True):
+    st.switch_page("pages/cadastro.py")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### Filtrar Imóveis")
@@ -556,56 +548,3 @@ else:
                     ''', unsafe_allow_html=True)
 
                     st.markdown("</div>", unsafe_allow_html=True)
-
-
-# =============================================================================
-# GERADOR DE DOSSIÊ DOCUMENTAL
-# =============================================================================
-
-st.markdown("---")
-st.markdown("### 📁 Dossiê Documental do Imóvel")
-
-opcoes_codigos = [i["codigo"] for i in lista_imoveis]
-codigo_dossie = st.selectbox(
-    "Selecione o código do imóvel para consolidar o Dossiê Documental:",
-    options=[""] + opcoes_codigos,
-    key="select_codigo_dossie"
-)
-
-if codigo_dossie:
-    imovel_sel = next((i for i in lista_imoveis if i["codigo"] == codigo_dossie), None)
-    
-    col_dos1, col_dos2 = st.columns([1, 2])
-    with col_dos1:
-        if st.button("📄 Gerar Dossiê Documental", use_container_width=True, key="btn_gerar_dossie"):
-            with st.spinner("Buscando documentos no Drive e gerando PDF consolidado..."):
-                pdf_bytes, resultado = gerador_dossie.gerar_dossie_bytes(
-                    codigo_imovel=codigo_dossie,
-                    dados_imovel=imovel_sel
-                )
-                st.session_state["dossie_pdf_bytes"] = pdf_bytes
-                st.session_state["dossie_resultado"] = resultado
-
-    if "dossie_resultado" in st.session_state:
-        res = st.session_state["dossie_resultado"]
-        pdf_bytes = st.session_state.get("dossie_pdf_bytes")
-
-        if res.get("sucesso"):
-            st.success(res.get("mensagem", "Dossiê gerado com sucesso!"))
-        else:
-            st.warning(res.get("mensagem", "Atenção ao gerar o dossiê."))
-
-        if res.get("falhas"):
-            with st.expander("⚠️ Arquivos com alerta/erro ao incorporar"):
-                for falha in res["falhas"]:
-                    st.write(f"- **{falha['nome']}**: {falha['erro']}")
-
-        if pdf_bytes:
-            st.download_button(
-                label="📥 Baixar Dossiê Documental (PDF)",
-                data=pdf_bytes,
-                file_name=res.get("nome_arquivo", f"Dossie_{codigo_dossie}.pdf"),
-                mime="application/pdf",
-                use_container_width=True,
-                key="dl_dossie_pdf"
-            )
