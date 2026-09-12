@@ -16,6 +16,12 @@ from googleapiclient.discovery import build
 
 import gerador_pdf
 
+# IMPORTAÇÃO DO GERADOR DE DOSSIÊ DOCUMENTAL
+try:
+    import gerador_dossie
+except Exception:
+    gerador_dossie = None
+
 try:
     import gerar_posts
 except Exception:
@@ -205,6 +211,22 @@ def executar_gerador_pdf(codigo_imovel):
         return False, f"Erro ao gerar PDF: {e}"
 
 
+def executar_gerador_dossie(codigo_imovel, dados_imovel):
+    if gerador_dossie is None:
+        return False, "Módulo gerador_dossie não encontrado."
+    try:
+        importlib.reload(gerador_dossie)
+        pdf_bytes, resultado = gerador_dossie.gerar_dossie_bytes(
+            codigo_imovel=codigo_imovel,
+            dados_imovel=dados_imovel
+        )
+        if pdf_bytes and isinstance(pdf_bytes, (bytes, bytearray)) and len(pdf_bytes) > 100:
+            return True, pdf_bytes, resultado
+        return False, None, resultado.get("mensagem", "Falha ao gerar o Dossiê.")
+    except Exception as e:
+        return False, None, f"Erro ao gerar Dossiê Documental: {e}"
+
+
 def executar_gerador_posts(codigo_imovel):
     if gerar_posts is None:
         return False, "Modulo gerar_posts nao encontrado."
@@ -272,6 +294,8 @@ for var, val in [
     ("confirmar_tratamento", False),
     ("fotos_tratadas_zip", None),
     ("fotos_tratadas_nome", "fotos_tratadas.zip"),
+    ("dossie_bytes", None),
+    ("dossie_nome", "dossie.pdf"),
 ]:
     if var not in st.session_state:
         st.session_state[var] = val
@@ -419,6 +443,34 @@ if st.session_state.get("fotos_tratadas_zip"):
         use_container_width=True,
         type="primary",
         key="dl_fotos_tratadas",
+    )
+
+# =============================================================================
+# BOTÃO DE DOSSÍÊ DOCUMENTAL NA SIDEBAR (SEÇÃO CONFIDENCIAL)
+# =============================================================================
+st.sidebar.markdown("---")
+if st.sidebar.button("📄 Gerar Dossiê Documental", use_container_width=True, key="btn_dossie"):
+    if not codigo_busca:
+        st.sidebar.error("Informe o código do imóvel primeiro.")
+    else:
+        with st.spinner("Consolidando Dossiê Documental PDF..."):
+            ok, pdf_bytes, info_res = executar_gerador_dossie(codigo_busca, dados_imovel)
+        if ok:
+            st.session_state["dossie_bytes"] = pdf_bytes
+            st.session_state["dossie_nome"] = info_res.get("nome_arquivo", f"Dossie_{codigo_busca}.pdf")
+            st.sidebar.success(info_res.get("mensagem", "Dossiê gerado com sucesso!"))
+        else:
+            st.sidebar.error(info_res if isinstance(info_res, str) else info_res.get("mensagem", "Erro ao gerar Dossiê."))
+
+if st.session_state.get("dossie_bytes"):
+    st.sidebar.download_button(
+        "📥 Baixar Dossiê (PDF)",
+        data=st.session_state["dossie_bytes"],
+        file_name=st.session_state.get("dossie_nome", f"Dossie_{codigo_busca}.pdf"),
+        mime="application/pdf",
+        use_container_width=True,
+        type="primary",
+        key="dl_dossie_sidebar",
     )
 
 
