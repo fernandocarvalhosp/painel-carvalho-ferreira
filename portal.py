@@ -13,6 +13,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 import base64
+import math
 
 # =============================================================================
 # CONFIGURAÇÃO DA PÁGINA
@@ -36,8 +37,11 @@ NOME_ABA = "Imoveis"
 TELEFONE_FERNANDO = "5512988162626"
 TELEFONE_VALDIR = "5512992157474"
 
+ITENS_POR_PAGINA = 6
+
 # =============================================================================
 # ESTILO VISUAL – IDENTIDADE CARVALHO FERREIRA
+# Fundo bem fechado (quase preto) + dourado + off-white
 # =============================================================================
 
 st.markdown(
@@ -50,23 +54,32 @@ st.markdown(
     footer { visibility: hidden !important; }
 
     .stApp {
-        background-color: #0A1F2E;
+        background-color: #0B0F14;
         color: #F7F5F0;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
     .block-container {
         padding-top: 1.2rem;
-        padding-bottom: 5rem;
+        padding-bottom: 4rem;
         max-width: 1180px;
         padding-left: 1.5rem;
         padding-right: 1.5rem;
     }
 
+    /* Remove espaços extras que parecem botões vazios */
+    div[data-testid="stVerticalBlock"] > div {
+        gap: 0.4rem !important;
+    }
+
+    .element-container {
+        margin-bottom: 0 !important;
+    }
+
     /* ===== CABEÇALHO DE MARCA ===== */
     .brand-header {
         text-align: center;
-        padding: 0.5rem 0 0.8rem 0;
+        padding: 0.4rem 0 0.6rem 0;
     }
 
     .brand-title {
@@ -83,7 +96,7 @@ st.markdown(
         font-size: 0.72rem;
         font-weight: 500;
         letter-spacing: 3.5px;
-        color: #5C5C5C;
+        color: #6B7280;
         margin-top: 6px;
         text-transform: uppercase;
     }
@@ -92,53 +105,15 @@ st.markdown(
         width: 48px;
         height: 1px;
         background: #D4AF37;
-        margin: 14px auto 0 auto;
+        margin: 12px auto 0 auto;
         opacity: 0.9;
     }
 
     /* ===== MENU DE NAVEGAÇÃO FINO ===== */
-    .nav-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 2.8rem;
-        padding: 0.6rem 0 0.9rem 0;
-        flex-wrap: wrap;
-    }
-
-    .nav-item {
-        font-size: 0.78rem;
-        font-weight: 500;
-        letter-spacing: 1.8px;
-        color: #5C5C5C;
-        text-transform: uppercase;
-        text-decoration: none !important;
-        padding-bottom: 6px;
-        border-bottom: 1.5px solid transparent;
-        transition: all 0.2s ease;
-        cursor: pointer;
-        background: none;
-        border-top: none;
-        border-left: none;
-        border-right: none;
-    }
-
-    .nav-item:hover {
-        color: #F7F5F0;
-        border-bottom-color: rgba(212, 175, 55, 0.5);
-    }
-
-    .nav-item.active {
-        color: #F7F5F0;
-        border-bottom-color: #D4AF37;
-        font-weight: 600;
-    }
-
-    /* Botões nativos do Streamlit transformados em menu fino */
     div[data-testid="stHorizontalBlock"] button {
         background: transparent !important;
         border: none !important;
-        color: #5C5C5C !important;
+        color: #6B7280 !important;
         font-size: 0.78rem !important;
         font-weight: 500 !important;
         letter-spacing: 1.8px !important;
@@ -160,18 +135,18 @@ st.markdown(
     .thin-divider {
         border: none;
         height: 1px;
-        background: linear-gradient(90deg, transparent, #1A3A4F 15%, #1A3A4F 85%, transparent);
-        margin: 0.4rem 0 1.6rem 0;
+        background: linear-gradient(90deg, transparent, #1F2937 15%, #1F2937 85%, transparent);
+        margin: 0.3rem 0 1.4rem 0;
     }
 
     /* ===== BUSCA ===== */
     .stTextInput > div > div > input {
-        background-color: #0D2538 !important;
-        border: 1px solid #1A3A4F !important;
+        background-color: #111827 !important;
+        border: 1px solid #1F2937 !important;
         border-radius: 6px !important;
         color: #F7F5F0 !important;
         font-size: 0.9rem !important;
-        padding: 0.6rem 0.9rem !important;
+        padding: 0.55rem 0.9rem !important;
     }
 
     .stTextInput > div > div > input:focus {
@@ -180,9 +155,8 @@ st.markdown(
     }
 
     .stTextInput label {
-        color: #5C5C5C !important;
+        color: #6B7280 !important;
         font-size: 0.8rem !important;
-        letter-spacing: 0.5px;
     }
 
     /* ===== TÍTULOS DE SEÇÃO ===== */
@@ -191,25 +165,25 @@ st.markdown(
         font-weight: 600 !important;
         color: #F7F5F0 !important;
         letter-spacing: 1px;
-        margin: 0.5rem 0 1.2rem 0;
+        margin: 0.3rem 0 1rem 0;
         text-transform: uppercase;
     }
 
     .section-count {
         font-size: 0.85rem;
-        color: #5C5C5C;
+        color: #6B7280;
         font-weight: 400;
         letter-spacing: 0.5px;
     }
 
     /* ===== CARDS DE IMÓVEIS ===== */
     .imovel-card {
-        background-color: #0D2538;
-        border: 1px solid #1A3A4F;
+        background-color: #111827;
+        border: 1px solid #1F2937;
         border-radius: 10px;
         padding: 14px;
-        margin-bottom: 18px;
-        transition: border-color 0.22s ease, transform 0.22s ease;
+        margin-bottom: 8px;
+        transition: border-color 0.2s ease;
         height: 100%;
     }
 
@@ -220,7 +194,7 @@ st.markdown(
     .foto-container-relativo {
         position: relative;
         width: 100%;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
         overflow: hidden;
         border-radius: 7px;
     }
@@ -229,9 +203,9 @@ st.markdown(
         border-radius: 7px;
         width: 100% !important;
         object-fit: cover !important;
-        height: 210px !important;
+        height: 200px !important;
         display: block;
-        transition: transform 0.35s ease;
+        transition: transform 0.3s ease;
     }
 
     .imovel-card:hover .foto-container-relativo img {
@@ -270,30 +244,30 @@ st.markdown(
     }
 
     .preco-imovel {
-        font-size: 1.25rem;
+        font-size: 1.22rem;
         font-weight: 700;
         color: #D4AF37;
-        margin-bottom: 6px;
+        margin-bottom: 5px;
         letter-spacing: 0.3px;
     }
 
     .codigo-tag {
         font-size: 0.72rem;
         font-weight: 600;
-        color: #5C5C5C;
-        background: #0A1F2E;
+        color: #6B7280;
+        background: #0B0F14;
         padding: 2px 7px;
         border-radius: 4px;
-        border: 1px solid #1A3A4F;
+        border: 1px solid #1F2937;
         display: inline-block;
-        margin-bottom: 8px;
+        margin-bottom: 7px;
         letter-spacing: 0.4px;
     }
 
     .info-sub {
         font-size: 0.82rem;
-        color: #5C5C5C;
-        margin-bottom: 3px;
+        color: #6B7280;
+        margin-bottom: 2px;
         line-height: 1.35;
     }
 
@@ -301,8 +275,8 @@ st.markdown(
         font-size: 0.88rem;
         font-weight: 560;
         color: #F7F5F0;
-        margin-top: 6px;
-        margin-bottom: 12px;
+        margin-top: 5px;
+        margin-bottom: 10px;
         line-height: 1.4;
     }
 
@@ -310,33 +284,42 @@ st.markdown(
     .stLinkButton > button {
         border-radius: 6px !important;
         font-weight: 600 !important;
-        background-color: #0A1F2E !important;
+        background-color: #0B0F14 !important;
         color: #F7F5F0 !important;
-        border: 1px solid #1A3A4F !important;
+        border: 1px solid #1F2937 !important;
         width: 100% !important;
         font-size: 0.78rem !important;
-        padding: 0.45rem 0.4rem !important;
+        padding: 0.42rem 0.4rem !important;
         letter-spacing: 0.3px;
         transition: all 0.2s ease !important;
     }
 
     .stLinkButton > button:hover {
-        background-color: #0D2538 !important;
+        background-color: #111827 !important;
         border-color: #D4AF37 !important;
         color: #ffffff !important;
+    }
+
+    /* ===== PAGINAÇÃO ===== */
+    .paginacao-info {
+        text-align: center;
+        font-size: 0.82rem;
+        color: #6B7280;
+        margin: 1.2rem 0 0.6rem 0;
+        letter-spacing: 0.4px;
     }
 
     /* ===== RODAPÉ ===== */
     .footer-cf {
         text-align: center;
-        margin-top: 3.5rem;
-        padding-top: 1.5rem;
-        border-top: 1px solid #1A3A4F;
+        margin-top: 2.8rem;
+        padding-top: 1.3rem;
+        border-top: 1px solid #1F2937;
     }
 
     .footer-text {
         font-size: 0.72rem;
-        color: #5C5C5C;
+        color: #6B7280;
         letter-spacing: 1.5px;
         text-transform: uppercase;
     }
@@ -355,9 +338,6 @@ st.markdown(
             font-size: 1.45rem !important;
             letter-spacing: 3px;
         }
-        .nav-container {
-            gap: 1.4rem;
-        }
         div[data-testid="stHorizontalBlock"] button {
             font-size: 0.68rem !important;
             letter-spacing: 1.2px !important;
@@ -366,14 +346,13 @@ st.markdown(
             padding: 12px;
         }
         .foto-container-relativo img {
-            height: 190px !important;
+            height: 180px !important;
         }
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
-
 
 # =============================================================================
 # CONEXÕES GOOGLE
@@ -470,11 +449,14 @@ def obter_foto_miniatura_por_id(file_id):
 
 
 # =============================================================================
-# ESTADO DA NAVEGAÇÃO
+# ESTADO
 # =============================================================================
 
 if "cat" not in st.session_state:
     st.session_state["cat"] = "DESTAQUES"
+
+if "pagina" not in st.session_state:
+    st.session_state["pagina"] = 1
 
 # =============================================================================
 # CABEÇALHO DE MARCA
@@ -498,7 +480,7 @@ with col_c:
         )
 
 # =============================================================================
-# MENU DE NAVEGAÇÃO FINO (texto + underline)
+# MENU DE NAVEGAÇÃO FINO
 # =============================================================================
 
 categorias = ["DESTAQUES", "CASAS", "APARTAMENTOS", "TERRENOS", "COMERCIAIS"]
@@ -506,12 +488,11 @@ cols_nav = st.columns(len(categorias))
 
 for i, cat_nome in enumerate(categorias):
     with cols_nav[i]:
-        # O CSS acima transforma esses botões em links finos com underline
         if st.button(cat_nome, key=f"nav_{cat_nome}", use_container_width=True):
             st.session_state["cat"] = cat_nome
+            st.session_state["pagina"] = 1  # volta para a primeira página ao trocar categoria
             st.rerun()
 
-# Linha divisória fina
 st.markdown('<hr class="thin-divider">', unsafe_allow_html=True)
 
 # =============================================================================
@@ -523,8 +504,6 @@ busca_codigo = st.text_input(
     placeholder="Ex: CF024",
     label_visibility="collapsed",
 )
-
-st.markdown("<div style='height: 0.6rem'></div>", unsafe_allow_html=True)
 
 # =============================================================================
 # CARREGAMENTO E FILTRAGEM
@@ -542,14 +521,14 @@ cat_ativa = st.session_state["cat"]
 if busca_codigo and busca_codigo.strip():
     termo = normalizar(busca_codigo)
     imoveis_exibidos = [i for i in lista_imoveis if termo in normalizar(i["codigo"])]
-    titulo_secao = f"Resultado da busca"
+    titulo_secao = "Resultado da busca"
+    st.session_state["pagina"] = 1
 else:
     if cat_ativa == "DESTAQUES":
-        # Mostra apenas disponíveis (pode ser ajustado para um campo "Destaque" na planilha)
         imoveis_exibidos = [
             i for i in lista_imoveis
             if "DISPONÍVEL" in normalizar(i["status"]) or "DISPONIVEL" in normalizar(i["status"])
-        ][:12]  # limita para não sobrecarregar a home
+        ]
         titulo_secao = "Destaques"
     elif cat_ativa == "CASAS":
         imoveis_exibidos = [i for i in lista_imoveis if "CASA" in normalizar(i["tipo"])]
@@ -577,32 +556,46 @@ else:
         titulo_secao = "Comerciais"
 
 # Título da seção
+total = len(imoveis_exibidos)
 st.markdown(
     f"""
     <div class="section-title">
         {titulo_secao}
-        <span class="section-count"> · {len(imoveis_exibidos)} imóveis</span>
+        <span class="section-count"> · {total} imóveis</span>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
 # =============================================================================
-# GRID DE CARDS
+# PAGINAÇÃO (6 por página)
 # =============================================================================
 
 if not imoveis_exibidos:
     st.info("Nenhum imóvel encontrado nesta categoria ou busca.")
 else:
-    for inicio in range(0, len(imoveis_exibidos), 3):
-        grupo = imoveis_exibidos[inicio : inicio + 3]
-        colunas = st.columns(3)
+    total_paginas = max(1, math.ceil(total / ITENS_POR_PAGINA))
+    pagina_atual = st.session_state["pagina"]
+
+    # Garante que a página atual é válida
+    if pagina_atual > total_paginas:
+        pagina_atual = 1
+        st.session_state["pagina"] = 1
+
+    inicio = (pagina_atual - 1) * ITENS_POR_PAGINA
+    fim = inicio + ITENS_POR_PAGINA
+    pagina_imoveis = imoveis_exibidos[inicio:fim]
+
+    # Grid de cards (3 colunas)
+    for i in range(0, len(pagina_imoveis), 3):
+        grupo = pagina_imoveis[i : i + 3]
+        colunas = st.columns(3, gap="medium")
 
         for posicao, imovel in enumerate(grupo):
             with colunas[posicao]:
                 st.markdown('<div class="imovel-card">', unsafe_allow_html=True)
 
-                # Status badge
+                # Status
                 st_normal = normalizar(imovel["status"])
                 if "NEGOCIAÇÃO" in st_normal or "NEGOCIACAO" in st_normal:
                     badge_classe = "status-negociacao"
@@ -631,7 +624,7 @@ else:
                 else:
                     st.markdown(
                         f"""
-                        <div class="foto-container-relativo" style="background:#0A1F2E;height:210px;display:flex;align-items:center;justify-content:center;color:#5C5C5C;border-radius:7px;">
+                        <div class="foto-container-relativo" style="background:#0B0F14;height:200px;display:flex;align-items:center;justify-content:center;color:#6B7280;border-radius:7px;">
                             <span class="status-badge {badge_classe}">{badge_texto}</span>
                             <span style="font-size:0.8rem;">Foto em breve</span>
                         </div>
@@ -674,7 +667,7 @@ else:
                     unsafe_allow_html=True,
                 )
 
-                # WhatsApp – conversão
+                # WhatsApp
                 msg_whats = (
                     f"Olá, tenho interesse no imóvel {imovel['codigo']} "
                     f"({imovel['tipo']} em {imovel['bairro']}). "
@@ -690,6 +683,27 @@ else:
                     st.link_button("Valdir", link_wv, use_container_width=True)
 
                 st.markdown("</div>", unsafe_allow_html=True)
+
+    # Controles de paginação
+    if total_paginas > 1:
+        st.markdown(
+            f'<div class="paginacao-info">Página {pagina_atual} de {total_paginas}</div>',
+            unsafe_allow_html=True,
+        )
+
+        col_prev, col_info, col_next = st.columns([1, 2, 1])
+
+        with col_prev:
+            if pagina_atual > 1:
+                if st.button("← Anterior", use_container_width=True, key="btn_prev"):
+                    st.session_state["pagina"] = pagina_atual - 1
+                    st.rerun()
+
+        with col_next:
+            if pagina_atual < total_paginas:
+                if st.button("Próxima →", use_container_width=True, key="btn_next"):
+                    st.session_state["pagina"] = pagina_atual + 1
+                    st.rerun()
 
 # =============================================================================
 # RODAPÉ
