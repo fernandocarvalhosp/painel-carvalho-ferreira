@@ -4,7 +4,7 @@ import sys
 import os
 from pathlib import Path
 
-# FORÇA O CAMINHO EXATO: Insere a pasta raiz (pai) no *início* das rotas de busca do Python
+# 1. Garante que a raiz do projeto esteja no sys.path ANTES de importar módulos próprios
 raiz_projeto = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if raiz_projeto not in sys.path:
     sys.path.insert(0, raiz_projeto)
@@ -16,11 +16,13 @@ from googleapiclient.discovery import build
 
 import gerador_pdf
 
-# IMPORTAÇÃO DO GERADOR DE DOSSIÊ DOCUMENTAL
+# IMPORTAÇÃO DOS MÓDULOS COM CAPTURA DE ERRO DETALHADA
+erro_import_dossie = None
 try:
     import gerador_dossie
-except Exception:
+except Exception as e:
     gerador_dossie = None
+    erro_import_dossie = str(e)
 
 try:
     import gerar_posts
@@ -213,7 +215,8 @@ def executar_gerador_pdf(codigo_imovel):
 
 def executar_gerador_dossie(codigo_imovel, dados_imovel):
     if gerador_dossie is None:
-        return False, None, {"mensagem": "Módulo gerador_dossie não encontrado."}
+        detalhe = f" ({erro_import_dossie})" if erro_import_dossie else ""
+        return False, None, {"mensagem": f"Módulo gerador_dossie não pôde ser carregado{detalhe}."}
     try:
         importlib.reload(gerador_dossie)
         pdf_bytes, resultado = gerador_dossie.gerar_dossie_bytes(
@@ -446,7 +449,7 @@ if st.session_state.get("fotos_tratadas_zip"):
     )
 
 # =============================================================================
-# BOTÃO DE DOSSIÊ DOCUMENTAL NA SIDEBAR (SEÇÃO CONFIDENCIAL)
+# BOTÃO DE DOSSIÊ DOCUMENTAL NA SIDEBAR
 # =============================================================================
 st.sidebar.markdown("---")
 if st.sidebar.button("📄 Gerar Dossiê Documental", use_container_width=True, key="btn_dossie"):
