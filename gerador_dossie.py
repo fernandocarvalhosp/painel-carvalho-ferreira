@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 gerador_dossie.py
-Gera o Dossiê Documental unificando arquivos (PDFs e Imagens) da subpasta DOCUMENTOS
-no Google Drive, gerando capa, resumo LGPD e encerramento em memória.
+Gera o Dossiê Documental (Gerador C / VECÃO) unificando arquivos (PDFs e Imagens) 
+da subpasta DOCUMENTOS no Google Drive, adicionando capa e página de encerramento/LGPD.
 """
 
 import io
+import re
+import unicodedata
 from pathlib import Path
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -30,7 +32,37 @@ ID_RAIZ = "1NaZ7kv_jHVCTlLV8vqxCzBwbTX5y3fR7"
 
 
 # ==========================================
-# CONEXÃO E NAVEGAÇÃO NO GOOGLE DRIVE
+# FUNÇÕES DE NORMALIZAÇÃO E LIMPEZA DE TEXTO
+# ==========================================
+
+def normalizar_texto(texto):
+    """Remove acentos, converte para maiúsculas e remove espaços extras."""
+    if not texto:
+        return ""
+    texto = unicodedata.normalize("NFD", texto)
+    texto = "".join(c for c in texto if unicodedata.category(c) != "Mn")
+    return " ".join(texto.upper().split())
+
+
+def extrair_codigo_chave(texto):
+    """
+    Extrai e padroniza o código do imóvel (ex: 'cf007 - casa continental' -> 'CF007').
+    Funciona para formatos variados como CF007, CF 007, CF-007, C01, etc.
+    """
+    if not texto:
+        return ""
+    texto_norm = normalizar_texto(texto)
+    
+    # Busca padrão de 1 a 4 letras seguidas de 1 a 4 números
+    match = re.search(r'([A-Z]{1,4}\s*[-_]?\s*\d{1,4})', texto_norm)
+    if match:
+        return re.sub(r'[^A-Z0-9]', '', match.group(1))
+    
+    return re.sub(r'[^A-Z0-9]', '', texto_norm)
+
+
+# ==========================================
+# CONEXÃO E NAVEGAÇÃO ROBUSTA NO GOOGLE DRIVE
 # ==========================================
 
 def conectar_google():
@@ -49,10 +81,10 @@ def conectar_google():
         return None, None
 
 
-def buscar_id_por_nome(service, nome_item, id_pasta_pai):
-    """Busca pasta aceitando nome exato ou termo contido (ex: IMOVEIS / IMOVEIS DISSOLUCAO)."""
+def listar_subpastas(service, id_pasta_pai):
+    """Retorna todas as subpastas ativas dentro de uma pasta pai."""
     if not service or not id_pasta_pai:
-        return None
+        return []
 
     query = (
         f"'{id_pasta_pai}' in parents "
@@ -69,80 +101,80 @@ def buscar_id_por_nome(service, nome_item, id_pasta_pai):
             includeItemsFromAllDrives=True,
         ).execute()
 
-        files = results.get("files", [])
-        nome_busca = nome_item.strip().upper()
-
-        # Match exato
-        for f in files:
-            if f["name"].strip().upper() == nome_busca:
-                return f["id"]
-
-        # Match parcial
-        for f in files:
-            if nome_busca in f["name"].strip().upper():
-                return f["id"]
-
-        return None
+        return results.get("files", [])
     except Exception as e:
-        print(f"Erro ao buscar '{nome_item}': {e}", flush=True)
-        return None
+        print(f"Erro ao listar subpastas do pai '{id_pasta_pai}': {e}", flush=True)
+        return []
+
+
+def buscar_id_por_nome(service, nome_item, id_pasta_pai):
+    """Busca uma pasta tolerando diferenças de acentuação e maiúsculas/minúsculas."""
+    subpastas = listar_subpastas(service, id_pasta_pai)
+    alvo = normalizar_texto(nome_item)
+
+    for f in subpastas:
+        if normalizar_texto(f["name"]) == alvo:
+            return f["id"]
+
+    for f in subpastas:
+        nome_f = normalizar_texto(f["name"])
+        if alvo in nome_f or nome_f in alvo:
+            return f["id"]
+
+    return None
 
 
 def buscar_pasta_imovel_por_codigo(service, codigo_imovel, id_pasta_imoveis):
-    """Localiza a pasta do imóvel sem problemas de maiúsculas/minúsculas."""
-    if not service or not id_pasta_imoveis:
+    """
+    Localiza a pasta do imóvel no Drive isolando a sigla/código principal.
+    Suporta entradas como 'cf007', 'CF007', 'cf007 - casa continental', 'CF 007'.
+    """
+    subpastas = listar_subpastas(service, id_pasta_imoveis)
+    cod_chave = extrair_codigo_chave(codigo_imovel)
+
+    if not cod_chave:
         return None
 
-    codigo = codigo_imovel.strip().upper()
+    # 1. Busca por código chave exato (ex: 'CF007' == 'CF007')
+    for f in subpastas:
+        if extrair_codigo_chave(f["name"]) == cod_chave:
+            return f["id"]
 
-    query = (
-        f"'{id_pasta_imoveis}' in parents "
-        f"and mimeType = 'application/vnd.google-apps.folder' "
-        f"and trashed = false"
-    )
+    # 2. Busca por prefixo ou inclusão parcial
+    for f in subpastas:
+        nome_limpo = extrair_codigo_chave(f["name"])
+        if nome_limpo.startswith(cod_chave) or cod_chave in nome_limpo:
+            return f["id"]
 
-    try:
-        results = service.files().list(
-            q=query,
-            fields="files(id, name)",
-            pageSize=1000,
-            supportsAllDrives=True,
-            includeItemsFromAllDrives=True,
-        ).execute()
-
-        files = results.get("files", [])
-
-        for f in files:
-            nome = f["name"].strip().upper()
-            if (
-                nome == codigo
-                or nome.startswith(codigo + " ")
-                or nome.startswith(codigo + "-")
-                or nome.startswith(codigo + "_")
-            ):
-                return f["id"]
-
-        return None
-    except Exception as e:
-        print(f"Erro ao buscar pasta do imovel '{codigo_imovel}': {e}", flush=True)
-        return None
+    return None
 
 
 def obter_id_pasta_documentos(service, codigo_imovel):
-    """Busca a subpasta 'DOCUMENTOS' dentro do imóvel."""
+    """
+    Navega na hierarquia (PORTFOLIO -> IMOVEIS -> [PASTA_IMOVEL] -> DOCUMENTOS).
+    """
     id_portfolio = buscar_id_por_nome(service, "PORTFOLIO", ID_RAIZ)
     if not id_portfolio:
+        print("Pasta 'PORTFOLIO' não encontrada.", flush=True)
         return None
 
     id_imoveis = buscar_id_por_nome(service, "IMOVEIS", id_portfolio)
     if not id_imoveis:
+        print("Pasta 'IMOVEIS' não encontrada.", flush=True)
         return None
 
     id_imovel = buscar_pasta_imovel_por_codigo(service, codigo_imovel, id_imoveis)
     if not id_imovel:
+        print(f"Pasta do imóvel para '{codigo_imovel}' não encontrada.", flush=True)
         return None
 
+    # Tenta encontrar a subpasta 'DOCUMENTOS' ou variações comuns
     id_documentos = buscar_id_por_nome(service, "DOCUMENTOS", id_imovel)
+    if not id_documentos:
+        id_documentos = buscar_id_por_nome(service, "DOCUMENTO", id_imovel)
+    if not id_documentos:
+        id_documentos = buscar_id_por_nome(service, "DOCS", id_imovel)
+
     return id_documentos
 
 
@@ -268,18 +300,18 @@ def gerar_dossie_documental(codigo_imovel):
     """
     Função principal do Gerador C:
     Busca a pasta DOCUMENTOS, consolida PDFs e Imagens, adiciona Capa e Encerramento.
-    Retorna os bytes do PDF unificado em memória.
+    Retorna os bytes do PDF unificado em memória RAM.
     """
     drive, _ = conectar_google()
     if not drive:
         return None
 
-    codigo_imovel = str(codigo_imovel).strip().upper()
+    codigo_imovel = str(codigo_imovel).strip()
 
     # 1. Localiza a subpasta DOCUMENTOS do imóvel
     id_pasta_docs = obter_id_pasta_documentos(drive, codigo_imovel)
     if not id_pasta_docs:
-        print(f"Pasta DOCUMENTOS não encontrada para o código {codigo_imovel}.", flush=True)
+        print(f"Pasta DOCUMENTOS não encontrada para '{codigo_imovel}'.", flush=True)
         return None
 
     # 2. Lista os arquivos dentro da subpasta DOCUMENTOS
@@ -320,7 +352,7 @@ def gerar_dossie_documental(codigo_imovel):
                 for page in reader.pages:
                     writer.add_page(page)
             except Exception as e:
-                print(f"Erro ao anexa PDF {arq['name']}: {e}", flush=True)
+                print(f"Erro ao anexar PDF {arq['name']}: {e}", flush=True)
 
         elif mime.startswith("image/"):
             img_pdf_bytes = converter_imagem_para_pdf_bytes(arq_bytes)
