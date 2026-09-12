@@ -46,10 +46,9 @@ st.markdown(
         max-width: 1200px;
     }
 
-    /* ESTILIZAÇÃO DO CABEÇALHO CENTRALIZADO */
     .brand-container {
         text-align: center;
-        margin-bottom: 1.5rem;
+        margin-bottom: 1rem;
     }
 
     .brand-title {
@@ -68,6 +67,8 @@ st.markdown(
         color: #8b949e;
         margin-top: 6px;
         text-transform: uppercase;
+        text-align: center;
+        margin-bottom: 25px;
     }
 
     /* BOTÕES DA BARRA SUPERIOR MAIS ESTREITOS E PRÓXIMOS */
@@ -79,7 +80,7 @@ st.markdown(
         font-size: 0.75rem !important;
         font-weight: 600 !important;
         letter-spacing: 1px !important;
-        padding: 6px 10px !important;
+        padding: 4px 8px !important;
         transition: all 0.2s ease !important;
     }
     
@@ -92,7 +93,7 @@ st.markdown(
     .foto-container-relativo {
         position: relative;
         width: 100%;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
     }
 
     .foto-container-relativo img {
@@ -151,19 +152,18 @@ st.markdown(
         font-size: 1.3rem;
         font-weight: 700;
         color: #d4af37;
-        margin-top: 10px;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
     }
 
     .tipo-detalhe {
-        font-size: 1rem;
+        font-size: 0.95rem;
         font-weight: 600;
         color: #f7f5ef;
-        margin-bottom: 2px;
+        margin-bottom: 4px;
     }
 
     .info-sub {
-        font-size: 0.9rem;
+        font-size: 0.85rem;
         color: #8b949e;
         margin-bottom: 4px;
     }
@@ -177,21 +177,20 @@ st.markdown(
         border-radius: 6px;
         border: 1px solid #30363d;
         display: inline-block;
-        margin-bottom: 10px;
-        margin-top: 4px;
+        margin-bottom: 8px;
     }
 
     .stLinkButton > button {
-        border-radius: 8px;
+        border-radius: 6px;
         font-weight: 600;
         background-color: #1f2937;
         color: #f7f5ef;
         border: 1px solid #374151;
         width: 100%;
-        transition: all 0.2s ease-in-out;
-        font-size: 0.85rem !important;
+        font-size: 0.8rem !important;
+        padding: 4px 8px !important;
     }
-
+    
     .stLinkButton > button:hover {
         background-color: #374151;
         border-color: #d4af37;
@@ -248,6 +247,7 @@ def carregar_imoveis_sheets():
             cidade = dados.get("CIDADE") or ""
             valor = dados.get("VALOR") or "Sob consulta"
             quartos = dados.get("QUARTOS") or dados.get("DORMS") or dados.get("DORMITORIOS") or ""
+            vagas = dados.get("VAGAS") or dados.get("GARAGEM") or ""
             area_util = dados.get("AREA UTIL") or dados.get("ÁREA ÚTIL") or ""
             status = dados.get("STATUS") or "Disponível"
             miniatura_id = dados.get("MINIATURA") or dados.get("FOTO") or ""
@@ -259,6 +259,7 @@ def carregar_imoveis_sheets():
                 "cidade": cidade,
                 "valor": valor,
                 "quartos": quartos,
+                "vagas": vagas,
                 "area_util": area_util,
                 "status": status,
                 "miniatura_id": miniatura_id.strip(),
@@ -289,7 +290,7 @@ def obter_foto_miniatura_por_id(file_id):
 if "cat" not in st.session_state:
     st.session_state["cat"] = "DESTAQUES"
 
-# CABEÇALHO COM LOGO OU TEXTO ESTILIZADO E CENTRALIZADO
+# CABEÇALHO CENTRALIZADO
 col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
 with col_l2:
     logo_path = Path("marca/logo.png")
@@ -304,11 +305,9 @@ with col_l2:
             """,
             unsafe_allow_html=True
         )
-    st.markdown('<div class="brand-subtitle" style="text-align: center;">Consultoria Imobiliária</div>', unsafe_allow_html=True)
+    st.markdown('<div class="brand-subtitle">Consultoria Imobiliária</div>', unsafe_allow_html=True)
 
-st.markdown("<br>", unsafe_allow_html=True)
-
-# BARRA DE NAVEGAÇÃO SUPERIOR COM BOTÕES ESTREITOS
+# BARRA DE NAVEGAÇÃO SUPERIOR (BOTÕES ESTREITOS E PRÓXIMOS)
 categorias = ["DESTAQUES", "CASAS", "APARTAMENTOS", "TERRENOS", "COMERCIAIS"]
 cols_nav = st.columns(len(categorias))
 
@@ -317,9 +316,11 @@ for i, cat_nome in enumerate(categorias):
         if st.button(cat_nome, key=f"nav_{cat_nome}", use_container_width=True):
             st.session_state["cat"] = cat_nome
 
-st.markdown("<br>", unsafe_allow_html=True)
-busca_codigo = st.text_input("Busca rápida por código do imóvel", placeholder="Digite o código (ex: CF001)")
 st.markdown("---")
+
+# BUSCA RÁPIDA POR CÓDIGO (TEXTO PURO, SEM EMOJIS)
+busca_codigo = st.text_input("Busca rápida por código do imóvel", placeholder="Digite o código (ex: CF001)")
+st.markdown("<br>", unsafe_allow_html=True)
 
 lista_imoveis = carregar_imoveis_sheets()
 
@@ -394,6 +395,7 @@ else:
                             </div>
                         ''', unsafe_allow_html=True)
 
+                    # 1. PREÇO EM DESTAQUE NO TOPO DO CARD
                     st.markdown(
                         f'''
                         <div class="preco-imovel">
@@ -403,35 +405,7 @@ else:
                         unsafe_allow_html=True,
                     )
 
-                    dorm_texto = f" • {imovel['quartos']} Dorm." if imovel["quartos"] else ""
-                    st.markdown(
-                        f'''
-                        <div class="tipo-detalhe">
-                            {imovel["tipo"]}{dorm_texto}
-                        </div>
-                        ''',
-                        unsafe_allow_html=True,
-                    )
-
-                    if imovel["area_util"]:
-                        st.markdown(
-                            f'''
-                            <div class="info-sub">
-                                Área: {imovel["area_util"]} úteis
-                            </div>
-                            ''',
-                            unsafe_allow_html=True,
-                        )
-
-                    st.markdown(
-                        f'''
-                        <div class="info-sub">
-                            {imovel["bairro"]} - {imovel["cidade"]}
-                        </div>
-                        ''',
-                        unsafe_allow_html=True,
-                    )
-
+                    # 2. CÓDIGO LOGO ABAIXO (SEM EMOJI)
                     st.markdown(
                         f'''
                         <div class="codigo-tag">
@@ -441,14 +415,37 @@ else:
                         unsafe_allow_html=True,
                     )
 
-                    if st.button(
-                        "Materiais do Imóvel",
-                        key=f"btn_mat_{imovel['codigo']}_{inicio}_{posicao}",
-                        use_container_width=True,
-                    ):
-                        st.session_state["codigo_materiais"] = imovel["codigo"]
-                        st.switch_page("pages/materiais.py")
+                    # 3. LOCALIZAÇÃO
+                    st.markdown(
+                        f'''
+                        <div class="info-sub">
+                            {imovel["bairro"]} - {imovel["cidade"]}
+                        </div>
+                        ''',
+                        unsafe_allow_html=True,
+                    )
 
+                    # 4. TIPO E DETALHES
+                    partes_info = [imovel["tipo"]]
+                    if imovel["quartos"]:
+                        partes_info.append(f"{imovel['quartos']} Dorm.")
+                    if imovel["vagas"]:
+                        partes_info.append(f"{imovel['vagas']} Vaga(s)")
+                    elif imovel["area_util"]:
+                        partes_info.append(f"{imovel['area_util']} úteis")
+
+                    st.markdown(
+                        f'''
+                        <div class="tipo-detalhe">
+                            {" • ".join(partes_info)}
+                        </div>
+                        ''',
+                        unsafe_allow_html=True,
+                    )
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+
+                    # BOTÕES DE WHATSAPP PARA OS CLIENTES FALAREM COM OS CONSULTORES
                     col_w1, col_w2 = st.columns(2)
                     msg_whats = f"Olá, tenho interesse no imóvel {imovel['codigo']} ({imovel['tipo']} em {imovel['bairro']}). Poderia me passar mais informações?"
                     
