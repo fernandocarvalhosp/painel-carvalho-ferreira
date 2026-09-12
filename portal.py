@@ -50,8 +50,8 @@ st.markdown(
     footer { visibility: hidden !important; }
 
     .stApp {
-        background-color: #0e1117;
-        color: #f0f2f6;
+        background-color: #0A1F2E;
+        color: #F7F5F0;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
@@ -73,7 +73,7 @@ st.markdown(
         font-size: 1.85rem !important;
         font-weight: 600 !important;
         letter-spacing: 5px;
-        color: #f7f5ef !important;
+        color: #F7F5F0 !important;
         margin: 0;
         text-transform: uppercase;
         line-height: 1.2;
@@ -83,7 +83,7 @@ st.markdown(
         font-size: 0.72rem;
         font-weight: 500;
         letter-spacing: 3.5px;
-        color: #8b949e;
+        color: #5C5C5C;
         margin-top: 6px;
         text-transform: uppercase;
     }
@@ -91,9 +91,9 @@ st.markdown(
     .brand-line {
         width: 48px;
         height: 1px;
-        background: #d4af37;
+        background: #D4AF37;
         margin: 14px auto 0 auto;
-        opacity: 0.85;
+        opacity: 0.9;
     }
 
     /* ===== MENU DE NAVEGAÇÃO FINO ===== */
@@ -110,7 +110,7 @@ st.markdown(
         font-size: 0.78rem;
         font-weight: 500;
         letter-spacing: 1.8px;
-        color: #8b949e;
+        color: #5C5C5C;
         text-transform: uppercase;
         text-decoration: none !important;
         padding-bottom: 6px;
@@ -124,21 +124,21 @@ st.markdown(
     }
 
     .nav-item:hover {
-        color: #f7f5ef;
-        border-bottom-color: rgba(212, 175, 55, 0.45);
+        color: #F7F5F0;
+        border-bottom-color: rgba(212, 175, 55, 0.5);
     }
 
     .nav-item.active {
-        color: #f7f5ef;
-        border-bottom-color: #d4af37;
+        color: #F7F5F0;
+        border-bottom-color: #D4AF37;
         font-weight: 600;
     }
 
-    /* Esconde botões nativos do Streamlit usados como navegação */
+    /* Botões nativos do Streamlit transformados em menu fino */
     div[data-testid="stHorizontalBlock"] button {
         background: transparent !important;
         border: none !important;
-        color: #8b949e !important;
+        color: #5C5C5C !important;
         font-size: 0.78rem !important;
         font-weight: 500 !important;
         letter-spacing: 1.8px !important;
@@ -151,8 +151,8 @@ st.markdown(
     }
 
     div[data-testid="stHorizontalBlock"] button:hover {
-        color: #f7f5ef !important;
-        border-bottom: 1.5px solid rgba(212, 175, 55, 0.45) !important;
+        color: #F7F5F0 !important;
+        border-bottom: 1.5px solid rgba(212, 175, 55, 0.5) !important;
         background: transparent !important;
     }
 
@@ -160,27 +160,27 @@ st.markdown(
     .thin-divider {
         border: none;
         height: 1px;
-        background: linear-gradient(90deg, transparent, #30363d 20%, #30363d 80%, transparent);
+        background: linear-gradient(90deg, transparent, #1A3A4F 15%, #1A3A4F 85%, transparent);
         margin: 0.4rem 0 1.6rem 0;
     }
 
     /* ===== BUSCA ===== */
     .stTextInput > div > div > input {
-        background-color: #161b22 !important;
-        border: 1px solid #30363d !important;
+        background-color: #0D2538 !important;
+        border: 1px solid #1A3A4F !important;
         border-radius: 6px !important;
-        color: #f7f5ef !important;
+        color: #F7F5F0 !important;
         font-size: 0.9rem !important;
         padding: 0.6rem 0.9rem !important;
     }
 
     .stTextInput > div > div > input:focus {
-        border-color: #d4af37 !important;
+        border-color: #D4AF37 !important;
         box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.25) !important;
     }
 
     .stTextInput label {
-        color: #8b949e !important;
+        color: #5C5C5C !important;
         font-size: 0.8rem !important;
         letter-spacing: 0.5px;
     }
@@ -189,7 +189,7 @@ st.markdown(
     .section-title {
         font-size: 1.05rem !important;
         font-weight: 600 !important;
-        color: #f7f5ef !important;
+        color: #F7F5F0 !important;
         letter-spacing: 1px;
         margin: 0.5rem 0 1.2rem 0;
         text-transform: uppercase;
@@ -197,15 +197,15 @@ st.markdown(
 
     .section-count {
         font-size: 0.85rem;
-        color: #8b949e;
+        color: #5C5C5C;
         font-weight: 400;
         letter-spacing: 0.5px;
     }
 
     /* ===== CARDS DE IMÓVEIS ===== */
     .imovel-card {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: #0D2538;
+        border: 1px solid #1A3A4F;
         border-radius: 10px;
         padding: 14px;
         margin-bottom: 18px;
@@ -214,7 +214,7 @@ st.markdown(
     }
 
     .imovel-card:hover {
-        border-color: #d4af37;
+        border-color: #D4AF37;
     }
 
     .foto-container-relativo {
@@ -272,7 +272,7 @@ st.markdown(
     .preco-imovel {
         font-size: 1.25rem;
         font-weight: 700;
-        color: #d4af37;
+        color: #D4AF37;
         margin-bottom: 6px;
         letter-spacing: 0.3px;
     }
@@ -280,11 +280,11 @@ st.markdown(
     .codigo-tag {
         font-size: 0.72rem;
         font-weight: 600;
-        color: #8b949e;
-        background: #1a1f2c;
+        color: #5C5C5C;
+        background: #0A1F2E;
         padding: 2px 7px;
         border-radius: 4px;
-        border: 1px solid #30363d;
+        border: 1px solid #1A3A4F;
         display: inline-block;
         margin-bottom: 8px;
         letter-spacing: 0.4px;
@@ -292,7 +292,7 @@ st.markdown(
 
     .info-sub {
         font-size: 0.82rem;
-        color: #8b949e;
+        color: #5C5C5C;
         margin-bottom: 3px;
         line-height: 1.35;
     }
@@ -300,7 +300,7 @@ st.markdown(
     .tipo-detalhe {
         font-size: 0.88rem;
         font-weight: 560;
-        color: #f7f5ef;
+        color: #F7F5F0;
         margin-top: 6px;
         margin-bottom: 12px;
         line-height: 1.4;
@@ -310,9 +310,9 @@ st.markdown(
     .stLinkButton > button {
         border-radius: 6px !important;
         font-weight: 600 !important;
-        background-color: #1f2937 !important;
-        color: #f7f5ef !important;
-        border: 1px solid #374151 !important;
+        background-color: #0A1F2E !important;
+        color: #F7F5F0 !important;
+        border: 1px solid #1A3A4F !important;
         width: 100% !important;
         font-size: 0.78rem !important;
         padding: 0.45rem 0.4rem !important;
@@ -321,8 +321,8 @@ st.markdown(
     }
 
     .stLinkButton > button:hover {
-        background-color: #374151 !important;
-        border-color: #d4af37 !important;
+        background-color: #0D2538 !important;
+        border-color: #D4AF37 !important;
         color: #ffffff !important;
     }
 
@@ -331,12 +331,12 @@ st.markdown(
         text-align: center;
         margin-top: 3.5rem;
         padding-top: 1.5rem;
-        border-top: 1px solid #21262d;
+        border-top: 1px solid #1A3A4F;
     }
 
     .footer-text {
         font-size: 0.72rem;
-        color: #6e7681;
+        color: #5C5C5C;
         letter-spacing: 1.5px;
         text-transform: uppercase;
     }
@@ -344,9 +344,9 @@ st.markdown(
     .footer-line {
         width: 36px;
         height: 1px;
-        background: #d4af37;
+        background: #D4AF37;
         margin: 10px auto 12px auto;
-        opacity: 0.7;
+        opacity: 0.75;
     }
 
     /* ===== RESPONSIVO ===== */
@@ -373,6 +373,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
 
 # =============================================================================
 # CONEXÕES GOOGLE
@@ -630,7 +631,7 @@ else:
                 else:
                     st.markdown(
                         f"""
-                        <div class="foto-container-relativo" style="background:#21262d;height:210px;display:flex;align-items:center;justify-content:center;color:#8b949e;border-radius:7px;">
+                        <div class="foto-container-relativo" style="background:#0A1F2E;height:210px;display:flex;align-items:center;justify-content:center;color:#5C5C5C;border-radius:7px;">
                             <span class="status-badge {badge_classe}">{badge_texto}</span>
                             <span style="font-size:0.8rem;">Foto em breve</span>
                         </div>
