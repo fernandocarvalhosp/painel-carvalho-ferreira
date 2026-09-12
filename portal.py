@@ -3,13 +3,14 @@
 
 import io
 import urllib.parse
+from pathlib import Path
 import streamlit as st
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
 # =============================================================================
-# CONFIGURAÇÕES DA PÁGINA (Portal Público | Carvalho Ferreira)
+# CONFIGURAÇÕES DA PÁGINA
 # =============================================================================
 
 st.set_page_config(
@@ -29,17 +30,15 @@ NOME_ABA = "Imoveis"
 
 
 # =============================================================================
-# ESTILO VISUAL: ELEGANTE, SILENCIOSO E COM IDENTIDADE DE ALTO PADRÃO
+# ESTILO VISUAL CORPORATIVO & MINIMALISTA
 # =============================================================================
 
 st.markdown(
     """
     <style>
-    /* Oculta navegação padrão e elementos de sistema */
     [data-testid="stSidebarNav"] { display: none; }
     header { visibility: hidden; }
     
-    /* Fundo geral e tipografia base */
     .stApp {
         background-color: #0b0e14;
         color: #e6edf3;
@@ -52,47 +51,22 @@ st.markdown(
         max-width: 1100px;
     }
 
-    /* Cabeçalho da Marca */
     .brand-container {
         text-align: center;
-        padding: 20px 0 10px 0;
-        border-bottom: 1px solid #21262d;
-        margin-bottom: 30px;
+        padding: 15px 0 5px 0;
     }
-    .brand-title {
-        font-size: 1.8rem;
-        font-weight: 300;
-        letter-spacing: 4px;
-        color: #f0f6fc;
-        margin: 0;
-    }
+    
     .brand-subtitle {
         font-size: 0.8rem;
         font-weight: 600;
         letter-spacing: 3px;
         color: #8b949e;
         margin-top: 6px;
+        margin-bottom: 25px;
         text-transform: uppercase;
-    }
-
-    /* Navegação Minimalista por Linhas */
-    .nav-container {
         text-align: center;
-        margin-bottom: 35px;
-        font-size: 0.95rem;
-        letter-spacing: 1px;
-    }
-    .nav-container a {
-        color: #8b949e;
-        text-decoration: none;
-        margin: 0 15px;
-        transition: color 0.2s ease;
-    }
-    .nav-container a:hover {
-        color: #f0f6fc;
     }
 
-    /* Cards de Imóveis (Estilo Editorial Limpo) */
     .imovel-card {
         background-color: #11161d;
         border: 1px solid #21262d;
@@ -119,7 +93,6 @@ st.markdown(
         margin-bottom: 12px;
     }
 
-    /* Botões personalizados */
     .stButton > button, .stLinkButton > button {
         border-radius: 6px;
         font-size: 0.85rem;
@@ -135,6 +108,11 @@ st.markdown(
         border-color: #8b949e;
         color: #ffffff;
     }
+    
+    /* Botão de categoria ativo/destacado */
+    div.stButton > button[kind="secondary"] {
+        border-color: #30363d;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -142,7 +120,7 @@ st.markdown(
 
 
 # =============================================================================
-# CONEXÃO GOOGLE (SECRETS)
+# CONEXÃO GOOGLE
 # =============================================================================
 
 @st.cache_resource
@@ -171,7 +149,7 @@ def normalizar(texto):
 
 
 # =============================================================================
-# CARREGAR DADOS DA PLANILHA (FILTRANDO APENAS PUBLICADOS)
+# CARREGAR DADOS DA PLANILHA
 # =============================================================================
 
 @st.cache_data(ttl=120)
@@ -199,7 +177,6 @@ def carregar_portal_imoveis():
             
             dados = {cabecalho[i]: row[i] for i in range(len(cabecalho))}
             
-            # Regra de Ouro: Só exibe se PUBLICAR NO PORTAL for SIM
             publicar = normalizar(dados.get("PUBLICAR NO PORTAL", ""))
             if publicar != "SIM":
                 continue
@@ -235,10 +212,6 @@ def carregar_portal_imoveis():
         st.error(f"Erro ao carregar o portal: {e}")
         return []
 
-
-# =============================================================================
-# BUSCA LEVE DA FOTO DA MINIATURA NO DRIVE
-# =============================================================================
 
 @st.cache_data(ttl=600)
 def obter_miniatura_drive(codigo):
@@ -288,33 +261,68 @@ def obter_miniatura_drive(codigo):
 
 
 # =============================================================================
-# INTERFACE DO PORTAL PÚBLICO
+# GERENCIAMENTO DE ESTADO PARA NAVEGAÇÃO
 # =============================================================================
 
-# Cabeçalho Oficial Carvalho Ferreira
-st.markdown(
-    """
-    <div class="brand-container">
-        <h1 class="brand-title">CARVALHO FERREIRA</h1>
-        <div class="brand-subtitle">Consultoria Imobiliária</div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+if "categoria_ativa" not in st.session_state:
+    st.session_state["categoria_ativa"] = "DESTAQUES"
 
-# Navegação Minimalista
-st.markdown(
-    """
-    <div class="nav-container">
-        <span>DESTAQUES</span> &nbsp;&nbsp;|&nbsp;&nbsp; 
-        <span>CASAS</span> &nbsp;&nbsp;|&nbsp;&nbsp; 
-        <span>APARTAMENTOS</span> &nbsp;&nbsp;|&nbsp;&nbsp; 
-        <span>TERRENOS</span> &nbsp;&nbsp;|&nbsp;&nbsp; 
-        <span>COMERCIAIS</span>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+def definir_categoria(cat):
+    st.session_state["categoria_ativa"] = cat
+
+
+# =============================================================================
+# CABEÇALHO COM LOGOTIPO
+# =============================================================================
+
+col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
+with col_l2:
+    logo_path = Path("marca/logo.png")
+    if logo_path.exists():
+        st.image(str(logo_path), use_container_width=True)
+    else:
+        st.markdown(
+            """
+            <div style="text-align: center;">
+                <h1 style="font-size: 1.8rem; font-weight: 300; letter-spacing: 4px; color: #f0f6fc; margin: 0;">CARVALHO FERREIRA</h1>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    st.markdown('<div class="brand-subtitle">Consultoria Imobiliária</div>', unsafe_allow_html=True)
+
+
+# =============================================================================
+# NAVEGAÇÃO POR BOTÕES (SUBSTITUINDO TEXTOS SIMPLES)
+# =============================================================================
+
+c_btn1, c_btn2, c_btn3, c_btn4, c_btn5 = st.columns(5)
+
+with c_btn1:
+    if st.button("DESTAQUES", use_container_width=True):
+        definir_categoria("DESTAQUES")
+with c_btn2:
+    if st.button("CASAS", use_container_width=True):
+        definir_categoria("CASAS")
+with c_btn3:
+    if st.button("APARTAMENTOS", use_container_width=True):
+        definir_categoria("APARTAMENTOS")
+with c_btn4:
+    if st.button("TERRENOS", use_container_width=True):
+        definir_categoria("TERRENOS")
+with c_btn5:
+    if st.button("COMERCIAIS", use_container_width=True):
+        definir_categoria("COMERCIAIS")
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# Busca rápida discreta
+busca_codigo = st.text_input("🔍 Busca rápida por código", placeholder="Digite o código (ex: CF001) e aperte Enter")
+
+
+# =============================================================================
+# CARREGAMENTO E FILTRAGEM DOS DADOS
+# =============================================================================
 
 lista_imoveis = carregar_portal_imoveis()
 
@@ -322,46 +330,63 @@ if not lista_imoveis:
     st.info("Nenhum imóvel disponível no momento.")
     st.stop()
 
-# Filtro rápido por código na barra lateral discreta
-pesquisa = st.sidebar.text_input("🔍 Buscar por Código", placeholder="Ex: CF001")
+# Se houver busca por código ativa
+imoveis_exibidos = []
+categoria_atual = st.session_state["categoria_ativa"]
 
-imoveis_exibidos = lista_imoveis
-if pesquisa:
-    termo = normalizar(pesquisa)
+if busca_codigo:
+    termo = normalizar(busca_codigo)
     imoveis_exibidos = [i for i in lista_imoveis if termo in normalizar(i["codigo"])]
+    st.markdown(f"### Resultado da busca: {busca_codigo}")
+else:
+    if categoria_atual == "DESTAQUES":
+        imoveis_exibidos = [i for i in lista_imoveis if i["destaque"]]
+        st.markdown("### Destaques Selecionados")
+    elif categoria_atual == "CASAS":
+        imoveis_exibidos = [i for i in lista_imoveis if "CASA" in normalizar(i["tipo"])]
+        st.markdown("### Casas Disponíveis")
+    elif categoria_atual == "APARTAMENTOS":
+        imoveis_exibidos = [i for i in lista_imoveis if "APARTAMENTO" in normalizar(i["tipo"]) or "APTO" in normalizar(i["tipo"])]
+        st.markdown("### Apartamentos Disponíveis")
+    elif categoria_atual == "TERRENOS":
+        imoveis_exibidos = [i for i in lista_imoveis if "TERRENO" in normalizar(i["tipo"]) or "LOTE" in normalizar(i["tipo"])]
+        st.markdown("### Terrenos e Lotes")
+    elif categoria_atual == "COMERCIAIS":
+        imoveis_exibidos = [i for i in lista_imoveis if "COMERCIAL" in normalizar(i["tipo"]) | "SALA" in normalizar(i["tipo"]) | "GALPÃO" in normalizar(i["tipo"])]
+        st.markdown("### Imóveis Comerciais")
 
-# Exibição em Grade Limpa
-st.markdown("### Oportunidades Selecionadas")
 st.markdown("---")
 
-colunas = st.columns(3)
-
-for indice, imovel in enumerate(imoveis_exibidos):
-    col = colunas[indice % 3]
-    with col:
-        st.markdown('<div class="imovel-card">', unsafe_allow_html=True)
-        
-        foto = obter_miniatura_drive(imovel["codigo"])
-        if foto:
-            st.image(foto, use_container_width=True)
-        else:
-            st.markdown("🖼️ *Em breve*")
+if not imoveis_exibidos:
+    st.info("Nenhum imóvel encontrado nesta categoria ou busca.")
+else:
+    colunas = st.columns(3)
+    for indice, imovel in enumerate(imoveis_exibidos):
+        col = colunas[indice % 3]
+        with col:
+            st.markdown('<div class="imovel-card">', unsafe_allow_html=True)
             
-        st.markdown(f"**{imovel['tipo']}** • {imovel['bairro']}")
-        st.markdown(f'<div class="imovel-preco">{imovel["valor"]}</div>', unsafe_allow_html=True)
-        
-        detalhes_parts = []
-        if imovel["area"]:
-            detalhes_parts.append(f"{imovel['area']} m²")
-        if imovel["quartos"]:
-            detalhes_parts.append(f"{imovel['quartos']} dorm.")
-        if imovel["vagas"]:
-            detalhes_parts.append(f"{imovel['vagas']} vaga(s)")
+            foto = obter_miniatura_drive(imovel["codigo"])
+            if foto:
+                st.image(foto, use_container_width=True)
+            else:
+                st.markdown("🖼️ *Em breve*")
+                
+            st.markdown(f"**{imovel['tipo']}** • {imovel['bairro']}")
+            st.markdown(f'<div class="imovel-preco">{imovel["valor"]}</div>', unsafe_allow_html=True)
             
-        st.markdown(f'<div class="imovel-detalhes">{" · ".join(detalhes_parts)}</div>', unsafe_allow_html=True)
-        
-        msg = f"Olá! Gostaria de mais informações sobre o imóvel {imovel['codigo']} visto no portal."
-        link_zap = f"https://wa.me/5512997777777?text={urllib.parse.quote(msg)}"
-        st.link_button("Falar com Consultor", link_zap, use_container_width=True)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+            detalhes_parts = []
+            if imovel["area"]:
+                detalhes_parts.append(f"{imovel['area']} m²")
+            if imovel["quartos"]:
+                detalhes_parts.append(f"{imovel['quartos']} dorm.")
+            if imovel["vagas"]:
+                detalhes_parts.append(f"{imovel['vagas']} vaga(s)")
+                
+            st.markdown(f'<div class="imovel-detalhes">{" · ".join(detalhes_parts)}</div>', unsafe_allow_html=True)
+            
+            msg = f"Olá! Gostaria de mais informações sobre o imóvel {imovel['codigo']} visto no portal."
+            link_zap = f"https://wa.me/5512997777777?text={urllib.parse.quote(msg)}"
+            st.link_button("Falar com Consultor", link_zap, use_container_width=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
