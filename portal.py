@@ -48,16 +48,29 @@ st.markdown(
         letter-spacing: 3px;
         color: #8b949e;
         margin-top: 6px;
-        margin-bottom: 25px;
+        margin-bottom: 30px;
         text-transform: uppercase;
         text-align: center;
     }
 
-    .nav-links-container {
-        text-align: center;
-        margin-bottom: 30px;
-        font-size: 0.85rem;
-        letter-spacing: 2px;
+    /* Transforma os botões da barra superior em texto puro elegante com linhas finas */
+    div.stButton > button {
+        background-color: transparent !important;
+        color: #8b949e !important;
+        border: none !important;
+        border-radius: 0px !important;
+        font-size: 0.85rem !important;
+        font-weight: 500 !important;
+        letter-spacing: 2px !important;
+        box-shadow: none !important;
+        transition: color 0.2s ease !important;
+        padding: 0px !important;
+    }
+    
+    div.stButton > button:hover {
+        color: #f0f6fc !important;
+        background-color: transparent !important;
+        border: none !important;
     }
 
     .imovel-card {
@@ -86,7 +99,7 @@ st.markdown(
         margin-bottom: 12px;
     }
 
-    .stButton > button, .stLinkButton > button {
+    .stLinkButton > button {
         border-radius: 6px;
         font-size: 0.85rem;
         font-weight: 500;
@@ -96,7 +109,7 @@ st.markdown(
         width: 100%;
         transition: all 0.2s ease;
     }
-    .stButton > button:hover, .stLinkButton > button:hover {
+    .stLinkButton > button:hover {
         background-color: #21262d;
         border-color: #8b949e;
         color: #ffffff;
@@ -254,7 +267,6 @@ with col_l2:
         )
     st.markdown('<div class="brand-subtitle">Consultoria Imobiliária</div>', unsafe_allow_html=True)
 
-# Navegação em texto puro funcional utilizando botões sem borda estilizados no layout
 cols_nav = st.columns(5)
 categorias = ["DESTAQUES", "CASAS", "APARTAMENTOS", "TERRENOS", "COMERCIAIS"]
 
@@ -265,7 +277,7 @@ for i, cat_nome in enumerate(categorias):
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-busca_codigo = st.text_input("🔍 Busca rápida por código", placeholder="Digite o código (ex: CF001) e aperte Enter")
+busca_codigo = st.text_input("Busca rápida por código do imóvel", placeholder="Digite o código (ex: CF001)")
 
 lista_imoveis = carregar_portal_imoveis()
 
@@ -302,7 +314,6 @@ st.markdown("---")
 if not imoveis_exibidos:
     st.info("Nenhum imóvel encontrado nesta categoria ou busca.")
 else:
-    # Paginação ou limitação de exibição (ex: lotes de 6)
     imoveis_pagina = imoveis_exibidos[:6]
     
     colunas = st.columns(3)
@@ -326,8 +337,7 @@ else:
             if imovel["quartos"]:
                 detalhes_parts.append(f"{imovel['quartos']} dorm.")
             if imovel["vagas"]:
-                detalses_parts_vaga = f"{imovel['vagas']} vaga(s)"
-                detalhes_parts.append(detalses_parts_vaga)
+                detalhes_parts.append(f"{imovel['vagas']} vaga(s)")
                 
             st.markdown(f'<div class="imovel-detalhes">{" · ".join(detalhes_parts)}</div>', unsafe_allow_html=True)
             
