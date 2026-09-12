@@ -21,7 +21,6 @@ from pathlib import Path
 import streamlit as st
 from PIL import Image, ImageOps
 from pypdf import PdfReader, PdfWriter, PageObject, Transformation
-from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 
 from google.oauth2 import service_account
@@ -121,7 +120,6 @@ def normalizar(valor):
 def extrair_codigo_chave(texto):
     """
     Extrai o código principal (ex: 'CF007', 'CR007', 'C001').
-    Transforma 'cf007 - casa continental', 'CF 007' ou 'CF-007' em 'CF007'.
     """
     if not texto:
         return ""
@@ -143,13 +141,7 @@ def valor_preenchido(valor):
     if not texto:
         return False
 
-    if texto.lower() in {
-        "nan",
-        "none",
-        "null",
-        "-",
-        "--",
-    }:
+    if texto.lower() in {"nan", "none", "null", "-", "--"}:
         return False
 
     return True
@@ -228,14 +220,7 @@ def get_dado(dados, *chaves):
 # DRIVE
 # =========================================================
 
-def buscar_id_por_nome(
-    service,
-    nome_item,
-    id_pasta_pai,
-):
-    """
-    Procura uma pasta/arquivo tolerando diferenças de acentuação e caixa.
-    """
+def buscar_id_por_nome(service, nome_item, id_pasta_pai):
     nome_normalizado = normalizar(nome_item)
     page_token = None
 
@@ -243,10 +228,7 @@ def buscar_id_por_nome(
         resposta = (
             service.files()
             .list(
-                q=(
-                    f"'{id_pasta_pai}' in parents "
-                    f"and trashed = false"
-                ),
+                q=f"'{id_pasta_pai}' in parents and trashed = false",
                 spaces="drive",
                 fields="nextPageToken, files(id,name,mimeType)",
                 pageToken=page_token,
@@ -257,12 +239,10 @@ def buscar_id_por_nome(
 
         arquivos = resposta.get("files", [])
 
-        # Match Exato
         for arquivo in arquivos:
             if normalizar(arquivo.get("name")) == nome_normalizado:
                 return arquivo["id"]
 
-        # Match Parcial
         for arquivo in arquivos:
             nome_f = normalizar(arquivo.get("name"))
             if nome_normalizado in nome_f or nome_f in nome_normalizado:
@@ -276,14 +256,7 @@ def buscar_id_por_nome(
     return None
 
 
-def buscar_pasta_imovel(
-    service,
-    codigo_imovel,
-    id_pasta_imoveis,
-):
-    """
-    Localiza a pasta do imóvel dentro de IMOVEIS aceitando variações no nome.
-    """
+def buscar_pasta_imovel(service, codigo_imovel, id_pasta_imoveis):
     cod_chave = extrair_codigo_chave(codigo_imovel)
 
     if not cod_chave:
@@ -327,13 +300,7 @@ def buscar_pasta_imovel(
     return None
 
 
-def localizar_pasta_documentacao(
-    service,
-    codigo_imovel,
-):
-    """
-    Navega na hierarquia: PORTFOLIO -> IMOVEIS -> [PASTA DO IMÓVEL] -> documentos
-    """
+def localizar_pasta_documentacao(service, codigo_imovel):
     id_portfolio = buscar_id_por_nome(service, "PORTFOLIO", ID_RAIZ)
 
     if not id_portfolio:
@@ -366,16 +333,10 @@ def localizar_pasta_documentacao(
 
 
 # =========================================================
-# LISTAGEM DOS DOCUMENTOS
+# LISTAGEM E DOWNLOAD
 # =========================================================
 
-EXTENSOES_PERMITIDAS = {
-    ".pdf",
-    ".jpg",
-    ".jpeg",
-    ".png",
-    ".webp",
-}
+EXTENSOES_PERMITIDAS = {".pdf", ".jpg", ".jpeg", ".png", ".webp"}
 
 
 def listar_arquivos_documentacao(service, id_pasta):
@@ -423,10 +384,6 @@ def listar_arquivos_documentacao(service, id_pasta):
 
     return arquivos
 
-
-# =========================================================
-# DOWNLOAD
-# =========================================================
 
 def baixar_bytes(service, file_id):
     request = service.files().get_media(fileId=file_id)
@@ -686,8 +643,7 @@ body { background: {{ cor_fundo }}; color: {{ cor_navy }}; font-family: "Manrope
 def normalizar_pdf_para_a4(conteudo_pdf):
     """
     Recebe os bytes de um arquivo PDF e força a repaginação de todas as suas páginas 
-    para uma folha A4 Vertical (Portrait) padronizada, centralizando e escalando o conteúdo 
-    proporcionalmente, corrigindo visualmente páginas horizontais ou fora de escala.
+    para uma folha A4 Vertical (Portrait) padronizada.
     """
     reader = PdfReader(io.BytesIO(conteudo_pdf))
     writer = PdfWriter()
@@ -698,36 +654,32 @@ def normalizar_pdf_para_a4(conteudo_pdf):
         largura_orig = float(pagina.mediabox.width)
         altura_orig = float(pagina.mediabox.height)
 
-        # Trata rotação nativa do arquivo PDF, se houver
         rotacao = pagina.get("/Rotate", 0)
-        if rotaçao in [90, 270]:
+        if rotacao in [90, 270]:
             largura_orig, altura_orig = altura_orig, largura_orig
 
-        # Fator de escala proporcional para manter a dimensão dentro do A4 com margens de segurança
-        margem = 20.0  # pontos de margem
+        margem = 20.0
         largura_util = largura_a4 - (2 * margem)
         altura_util = altura_a4 - (2 * margem)
 
-        escala_x = largura_util / largura_orig
-        escala_y = altura_util / altura_orig
+        escala_x = largura_util / largura_orig if largura_orig > 0 else 1.0
+        escala_y = altura_util / altura_orig if altura_orig > 0 else 1.0
         escala = min(escala_x, escala_y)
 
         largura_redim = largura_orig * escala
         altura_redim = altura_orig * escala
 
-        # Offsets para centralização
         offset_x = (largura_a4 - largura_redim) / 2.0
         offset_y = (altura_a4 - altura_redim) / 2.0
 
-        # Cria uma nova página em branco no tamanho A4
         nova_pagina = PageObject.create_blank_page(width=largura_a4, height=altura_a4)
-
-        # Aplica a transformação de escala e deslocamento
         transformacao = Transformation().scale(escala, escala).translate(offset_x, offset_y)
-        pagina.add_transformation(transformacao)
+        
+        pagina_copia = PageObject.create_blank_page(width=largura_orig, height=altura_orig)
+        pagina_copia.merge_page(pagina)
+        pagina_copia.add_transformation(transformacao)
 
-        # Mescla o conteúdo transformado na página A4 em branco
-        nova_pagina.merge_page(pagina)
+        nova_pagina.merge_page(pagina_copia)
         writer.add_page(nova_pagina)
 
     saida = io.BytesIO()
@@ -905,9 +857,6 @@ def processar_documento(service, arquivo, codigo_imovel):
 # =========================================================
 
 def gerar_dossie(codigo_imovel, dados_imovel=None):
-    """
-    Função principal de geração do dossiê.
-    """
     codigo = str(codigo_imovel).strip().upper()
 
     if not codigo:
@@ -993,16 +942,18 @@ def gerar_dossie(codigo_imovel, dados_imovel=None):
 
         pdf_final, total_paginas = consolidar_pdfs(pdfs)
 
-        if falhas:
+        if falhas and documentos_processados == 0:
+            mensagem = f"Falha ao processar os arquivos do dossiê {codigo}."
+            sucesso = False
+        elif falhas:
             mensagem = (
                 f"Dossiê gerado parcialmente. "
-                f"{documentos_processados} de {len(arquivos)} documentos foram incorporados. "
-                f"{len(falhas)} documento(s) apresentaram erro."
+                f"{documentos_processados} de {len(arquivos)} documentos incorporados."
             )
-            sucesso = False
+            sucesso = True
         else:
             mensagem = (
-                f"Dossiê gerado com sucesso. "
+                f"Dossiê gerado com sucesso! "
                 f"{documentos_processados} documentos incorporados em {total_paginas} páginas."
             )
             sucesso = True
@@ -1033,7 +984,7 @@ def gerar_dossie(codigo_imovel, dados_imovel=None):
 
 
 # =========================================================
-# ALIASES DE COMPATIBILIDADE DO MÓDULO
+# ALIASES DE COMPATIBILIDADE
 # =========================================================
 
 def criar_dossie_consolidado(codigo_imovel, dados_imovel=None):
