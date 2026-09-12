@@ -6,4 +6,4 @@ google-auth-oauthlib
 weasyprint
 PyMuPDF
 pypdf
-pyllow
+pillow
