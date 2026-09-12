@@ -9,10 +9,6 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 
-# =============================================================================
-# CONFIGURAÇÕES DA PÁGINA
-# =============================================================================
-
 st.set_page_config(
     page_title="Carvalho Ferreira | Consultoria Imobiliária",
     page_icon="CF",
@@ -27,11 +23,6 @@ SCOPES_DRIVE = [
 
 SPREADSHEET_ID = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
 NOME_ABA = "Imoveis"
-
-
-# =============================================================================
-# ESTILO VISUAL CORPORATIVO & MINIMALISTA
-# =============================================================================
 
 st.markdown(
     """
@@ -51,11 +42,6 @@ st.markdown(
         max-width: 1100px;
     }
 
-    .brand-container {
-        text-align: center;
-        padding: 15px 0 5px 0;
-    }
-    
     .brand-subtitle {
         font-size: 0.8rem;
         font-weight: 600;
@@ -67,6 +53,14 @@ st.markdown(
         text-align: center;
     }
 
+    /* Navegação em texto puro clicável (estilo links elegantes) */
+    .nav-container {
+        text-align: center;
+        margin-bottom: 30px;
+        font-size: 0.9rem;
+        letter-spacing: 2px;
+    }
+    
     .imovel-card {
         background-color: #11161d;
         border: 1px solid #21262d;
@@ -108,20 +102,10 @@ st.markdown(
         border-color: #8b949e;
         color: #ffffff;
     }
-    
-    /* Botão de categoria ativo/destacado */
-    div.stButton > button[kind="secondary"] {
-        border-color: #30363d;
-    }
     </style>
     """,
     unsafe_allow_html=True,
 )
-
-
-# =============================================================================
-# CONEXÃO GOOGLE
-# =============================================================================
 
 @st.cache_resource
 def conectar_google():
@@ -141,16 +125,10 @@ def conectar_google():
         st.error(f"Erro na conexão: {e}")
         st.stop()
 
-
 def normalizar(texto):
     if not texto:
         return ""
     return " ".join(str(texto).strip().upper().split())
-
-
-# =============================================================================
-# CARREGAR DADOS DA PLANILHA
-# =============================================================================
 
 @st.cache_data(ttl=120)
 def carregar_portal_imoveis():
@@ -212,7 +190,6 @@ def carregar_portal_imoveis():
         st.error(f"Erro ao carregar o portal: {e}")
         return []
 
-
 @st.cache_data(ttl=600)
 def obter_miniatura_drive(codigo):
     try:
@@ -259,21 +236,8 @@ def obter_miniatura_drive(codigo):
     except Exception:
         return None
 
-
-# =============================================================================
-# GERENCIAMENTO DE ESTADO PARA NAVEGAÇÃO
-# =============================================================================
-
 if "categoria_ativa" not in st.session_state:
     st.session_state["categoria_ativa"] = "DESTAQUES"
-
-def definir_categoria(cat):
-    st.session_state["categoria_ativa"] = cat
-
-
-# =============================================================================
-# CABEÇALHO COM LOGOTIPO
-# =============================================================================
 
 col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
 with col_l2:
@@ -291,38 +255,28 @@ with col_l2:
         )
     st.markdown('<div class="brand-subtitle">Consultoria Imobiliária</div>', unsafe_allow_html=True)
 
+# Navegação em texto puro com botões invisíveis do Streamlit posicionados lado a lado
+c_n1, c_n2, c_n3, c_n4, c_n5 = st.columns(5)
 
-# =============================================================================
-# NAVEGAÇÃO POR BOTÕES (SUBSTITUINDO TEXTOS SIMPLES)
-# =============================================================================
-
-c_btn1, c_btn2, c_btn3, c_btn4, c_btn5 = st.columns(5)
-
-with c_btn1:
-    if st.button("DESTAQUES", use_container_width=True):
-        definir_categoria("DESTAQUES")
-with c_btn2:
-    if st.button("CASAS", use_container_width=True):
-        definir_categoria("CASAS")
-with c_btn3:
-    if st.button("APARTAMENTOS", use_container_width=True):
-        definir_categoria("APARTAMENTOS")
-with c_btn4:
-    if st.button("TERRENOS", use_container_width=True):
-        definir_categoria("TERRENOS")
-with c_btn5:
-    if st.button("COMERCIAIS", use_container_width=True):
-        definir_categoria("COMERCIAIS")
+with c_n1:
+    if st.button("DESTAQUES", key="btn_destaques", use_container_width=True):
+        st.session_state["categoria_ativa"] = "DESTAQUES"
+with c_n2:
+    if st.button("CASAS", key="btn_casas", use_container_width=True):
+        st.session_state["categoria_ativa"] = "CASAS"
+with c_n3:
+    if st.button("APARTAMENTOS", key="btn_apartamentos", use_container_width=True):
+        st.session_state["categoria_ativa"] = "APARTAMENTOS"
+with c_n4:
+    if st.button("TERRENOS", key="btn_terrenos", use_container_width=True):
+        st.session_state["categoria_ativa"] = "TERRENOS"
+with c_n5:
+    if st.button("COMERCIAIS", key="btn_comerciais", use_container_width=True):
+        st.session_state["categoria_ativa"] = "COMERCIAIS"
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Busca rápida discreta
 busca_codigo = st.text_input("🔍 Busca rápida por código", placeholder="Digite o código (ex: CF001) e aperte Enter")
-
-
-# =============================================================================
-# CARREGAMENTO E FILTRAGEM DOS DADOS
-# =============================================================================
 
 lista_imoveis = carregar_portal_imoveis()
 
@@ -330,7 +284,6 @@ if not lista_imoveis:
     st.info("Nenhum imóvel disponível no momento.")
     st.stop()
 
-# Se houver busca por código ativa
 imoveis_exibidos = []
 categoria_atual = st.session_state["categoria_ativa"]
 
@@ -352,7 +305,7 @@ else:
         imoveis_exibidos = [i for i in lista_imoveis if "TERRENO" in normalizar(i["tipo"]) or "LOTE" in normalizar(i["tipo"])]
         st.markdown("### Terrenos e Lotes")
     elif categoria_atual == "COMERCIAIS":
-        imoveis_exibidos = [i for i in lista_imoveis if "COMERCIAL" in normalizar(i["tipo"]) | "SALA" in normalizar(i["tipo"]) | "GALPÃO" in normalizar(i["tipo"])]
+        imoveis_exibidos = [i for i in lista_imoveis if "COMERCIAL" in normalizar(i["tipo"]) or "SALA" in normalizar(i["tipo"]) or "GALPÃO" in normalizar(i["tipo"])]
         st.markdown("### Imóveis Comerciais")
 
 st.markdown("---")
