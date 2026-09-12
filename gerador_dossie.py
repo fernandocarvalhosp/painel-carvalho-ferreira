@@ -2,11 +2,12 @@
 """
 gerador_dossie.py
 
-Gera um Dossiê Documental do Imóvel em um único PDF, mantido em memória.
+Gera um Dossiê Documental do Imóvel em um único PDF, mantido em memória,
+com padronização estrita de tamanho de página A4 Vertical (Portrait).
 
 ORDEM FINAL:
 1. Capa institucional
-2. Documentos encontrados na pasta DOCUMENTOS / DOCUMENTAÇÃO
+2. Documentos encontrados na pasta DOCUMENTOS / DOCUMENTAÇÃO (Normalizados para A4)
 3. Página de encerramento com contatos + LGPD
 """
 
@@ -19,7 +20,7 @@ from pathlib import Path
 
 import streamlit as st
 from PIL import Image, ImageOps
-from pypdf import PdfReader, PdfWriter
+from pypdf import PdfReader, PdfWriter, PageObject, Transformation
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 
@@ -233,7 +234,7 @@ def buscar_id_por_nome(
     id_pasta_pai,
 ):
     """
-    Procura uma pasta/arquivo tolerando diferenças de acentuação e caixa (ex: "documentos" vs "DOCUMENTOS").
+    Procura uma pasta/arquivo tolerando diferenças de acentuação e caixa.
     """
     nome_normalizado = normalizar(nome_item)
     page_token = None
@@ -256,7 +257,7 @@ def buscar_id_por_nome(
 
         arquivos = resposta.get("files", [])
 
-        # Match Exato (Ignorando maiúsculas/minúsculas e acentos)
+        # Match Exato
         for arquivo in arquivos:
             if normalizar(arquivo.get("name")) == nome_normalizado:
                 return arquivo["id"]
@@ -281,7 +282,7 @@ def buscar_pasta_imovel(
     id_pasta_imoveis,
 ):
     """
-    Localiza a pasta do imóvel dentro de IMOVEIS aceitando variações no nome da pasta.
+    Localiza a pasta do imóvel dentro de IMOVEIS aceitando variações no nome.
     """
     cod_chave = extrair_codigo_chave(codigo_imovel)
 
@@ -314,12 +315,10 @@ def buscar_pasta_imovel(
         if not page_token:
             break
 
-    # 1. Comparação Exata pelo Código Chave
     for pasta in todas_pastas:
         if extrair_codigo_chave(pasta.get("name")) == cod_chave:
             return pasta["id"]
 
-    # 2. Comparação por Prefixo / Inclusão
     for pasta in todas_pastas:
         nome_limpo = extrair_codigo_chave(pasta.get("name"))
         if nome_limpo.startswith(cod_chave) or cod_chave in nome_limpo:
@@ -335,59 +334,28 @@ def localizar_pasta_documentacao(
     """
     Navega na hierarquia: PORTFOLIO -> IMOVEIS -> [PASTA DO IMÓVEL] -> documentos
     """
-    id_portfolio = buscar_id_por_nome(
-        service,
-        "PORTFOLIO",
-        ID_RAIZ,
-    )
+    id_portfolio = buscar_id_por_nome(service, "PORTFOLIO", ID_RAIZ)
 
     if not id_portfolio:
-        raise FileNotFoundError(
-            "Pasta PORTFOLIO não encontrada no Drive."
-        )
+        raise FileNotFoundError("Pasta PORTFOLIO não encontrada no Drive.")
 
-    id_imoveis = buscar_id_por_nome(
-        service,
-        "IMOVEIS",
-        id_portfolio,
-    )
+    id_imoveis = buscar_id_por_nome(service, "IMOVEIS", id_portfolio)
 
     if not id_imoveis:
-        raise FileNotFoundError(
-            "Pasta IMOVEIS não encontrada dentro de PORTFOLIO."
-        )
+        raise FileNotFoundError("Pasta IMOVEIS não encontrada dentro de PORTFOLIO.")
 
-    id_imovel = buscar_pasta_imovel(
-        service,
-        codigo_imovel,
-        id_imoveis,
-    )
+    id_imovel = buscar_pasta_imovel(service, codigo_imovel, id_imoveis)
 
     if not id_imovel:
-        raise FileNotFoundError(
-            f"Pasta do imóvel {codigo_imovel} não encontrada."
-        )
+        raise FileNotFoundError(f"Pasta do imóvel {codigo_imovel} não encontrada.")
 
-    # Busca a pasta 'documentos' (a comparação insensível a maiúsculas/minúsculas resolve se for 'documentos' ou 'DOCUMENTOS')
-    id_documentos = buscar_id_por_nome(
-        service,
-        "documentos",
-        id_imovel,
-    )
+    id_documentos = buscar_id_por_nome(service, "documentos", id_imovel)
 
     if not id_documentos:
-        id_documentos = buscar_id_por_nome(
-            service,
-            "documentacao",
-            id_imovel,
-        )
+        id_documentos = buscar_id_por_nome(service, "documentacao", id_imovel)
 
     if not id_documentos:
-        id_documentos = buscar_id_por_nome(
-            service,
-            "docs",
-            id_imovel,
-        )
+        id_documentos = buscar_id_por_nome(service, "docs", id_imovel)
 
     if not id_documentos:
         raise FileNotFoundError(
@@ -410,10 +378,7 @@ EXTENSOES_PERMITIDAS = {
 }
 
 
-def listar_arquivos_documentacao(
-    service,
-    id_pasta,
-):
+def listar_arquivos_documentacao(service, id_pasta):
     arquivos = []
     page_token = None
 
@@ -421,15 +386,9 @@ def listar_arquivos_documentacao(
         resposta = (
             service.files()
             .list(
-                q=(
-                    f"'{id_pasta}' in parents "
-                    f"and trashed = false"
-                ),
+                q=f"'{id_pasta}' in parents and trashed = false",
                 spaces="drive",
-                fields=(
-                    "nextPageToken,"
-                    "files(id,name,mimeType,size)"
-                ),
+                fields="nextPageToken, files(id,name,mimeType,size)",
                 pageToken=page_token,
                 pageSize=1000,
             )
@@ -441,10 +400,7 @@ def listar_arquivos_documentacao(
             extensao = Path(nome).suffix.lower()
             mime = arquivo.get("mimeType", "")
 
-            compativel = (
-                mime == "application/pdf"
-                or extensao in EXTENSOES_PERMITIDAS
-            )
+            compativel = mime == "application/pdf" or extensao in EXTENSOES_PERMITIDAS
 
             if not compativel:
                 continue
@@ -463,9 +419,7 @@ def listar_arquivos_documentacao(
         if not page_token:
             break
 
-    arquivos.sort(
-        key=lambda item: normalizar(item["nome"])
-    )
+    arquivos.sort(key=lambda item: normalizar(item["nome"]))
 
     return arquivos
 
@@ -474,10 +428,7 @@ def listar_arquivos_documentacao(
 # DOWNLOAD
 # =========================================================
 
-def baixar_bytes(
-    service,
-    file_id,
-):
+def baixar_bytes(service, file_id):
     request = service.files().get_media(fileId=file_id)
     buffer = io.BytesIO()
     downloader = MediaIoBaseDownload(buffer, request)
@@ -635,12 +586,12 @@ HTML_IMAGEM = """
 @font-face { font-family: "Manrope"; src: url("{{ fonte_manrope_semibold }}"); font-weight: 600; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; width: 210mm; height: 297mm; }
-body { background: #ffffff; font-family: "Manrope", sans-serif; }
-.pagina { width: 210mm; height: 297mm; position: relative; background: #ffffff; display: flex; align-items: center; justify-content: center; padding: 15mm 13mm 20mm 13mm; }
+body { background: {{ cor_fundo }}; font-family: "Manrope", sans-serif; }
+.pagina { width: 210mm; height: 297mm; position: relative; background: {{ cor_fundo }}; display: flex; align-items: center; justify-content: center; padding: 15mm 13mm 20mm 13mm; }
 .area-documento { width: 184mm; height: 258mm; display: flex; align-items: center; justify-content: center; }
-.area-documento img { max-width: 184mm; max-height: 258mm; width: auto; height: auto; object-fit: contain; }
-.rodape { position: absolute; left: 13mm; right: 13mm; bottom: 8mm; height: 7mm; border-top: 0.3mm solid #e5e7eb; padding-top: 2mm; display: flex; justify-content: space-between; font-size: 6.5px; letter-spacing: 1px; color: #94a3b8; }
-.rodape-direita { font-weight: 600; color: #b99a5b; }
+.area-documento img { max-width: 184mm; max-height: 258mm; width: auto; height: auto; object-fit: contain; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.rodape { position: absolute; left: 13mm; right: 13mm; bottom: 8mm; height: 7mm; border-top: 0.3mm solid {{ cor_linha }}; padding-top: 2mm; display: flex; justify-content: space-between; font-size: 6.5px; letter-spacing: 1px; color: {{ cor_slate }}; }
+.rodape-direita { font-weight: 600; color: {{ cor_dourado }}; }
 </style>
 </head>
 <body>
@@ -729,6 +680,62 @@ body { background: {{ cor_fundo }}; color: {{ cor_navy }}; font-family: "Manrope
 
 
 # =========================================================
+# PROCESSAMENTO E NORMALIZAÇÃO DE PDFS A4
+# =========================================================
+
+def normalizar_pdf_para_a4(conteudo_pdf):
+    """
+    Recebe os bytes de um arquivo PDF e força a repaginação de todas as suas páginas 
+    para uma folha A4 Vertical (Portrait) padronizada, centralizando e escalando o conteúdo 
+    proporcionalmente, corrigindo visualmente páginas horizontais ou fora de escala.
+    """
+    reader = PdfReader(io.BytesIO(conteudo_pdf))
+    writer = PdfWriter()
+
+    largura_a4, altura_a4 = float(A4[0]), float(A4[1])  # 595.27 x 841.89 pt
+
+    for pagina in reader.pages:
+        largura_orig = float(pagina.mediabox.width)
+        altura_orig = float(pagina.mediabox.height)
+
+        # Trata rotação nativa do arquivo PDF, se houver
+        rotacao = pagina.get("/Rotate", 0)
+        if rotaçao in [90, 270]:
+            largura_orig, altura_orig = altura_orig, largura_orig
+
+        # Fator de escala proporcional para manter a dimensão dentro do A4 com margens de segurança
+        margem = 20.0  # pontos de margem
+        largura_util = largura_a4 - (2 * margem)
+        altura_util = altura_a4 - (2 * margem)
+
+        escala_x = largura_util / largura_orig
+        escala_y = altura_util / altura_orig
+        escala = min(escala_x, escala_y)
+
+        largura_redim = largura_orig * escala
+        altura_redim = altura_orig * escala
+
+        # Offsets para centralização
+        offset_x = (largura_a4 - largura_redim) / 2.0
+        offset_y = (altura_a4 - altura_redim) / 2.0
+
+        # Cria uma nova página em branco no tamanho A4
+        nova_pagina = PageObject.create_blank_page(width=largura_a4, height=altura_a4)
+
+        # Aplica a transformação de escala e deslocamento
+        transformacao = Transformation().scale(escala, escala).translate(offset_x, offset_y)
+        pagina.add_transformation(transformacao)
+
+        # Mescla o conteúdo transformado na página A4 em branco
+        nova_pagina.merge_page(pagina)
+        writer.add_page(nova_pagina)
+
+    saida = io.BytesIO()
+    writer.write(saida)
+    return saida.getvalue()
+
+
+# =========================================================
 # RENDERIZADORES
 # =========================================================
 
@@ -776,6 +783,7 @@ def gerar_capa_pdf_bytes(codigo_imovel, dados_imovel=None):
         "cor_claro": COR_CLARO,
         "cor_slate": COR_SLATE,
         "cor_dourado": COR_DOURADO,
+        "cor_linha": COR_LINHA,
         "fonte_cormorant": fonte_local("Cormorant Garamond", "CormorantGaramond-Medium.ttf"),
         "fonte_cormorant_semibold": fonte_local("Cormorant Garamond", "CormorantGaramond-SemiBold.ttf"),
         "fonte_manrope": fonte_local("Manrope", "Manrope-Regular.ttf"),
@@ -815,6 +823,10 @@ def gerar_pagina_imagem_pdf_bytes(conteudo_imagem, codigo_imovel):
     contexto = {
         "codigo": str(codigo_imovel).upper(),
         "imagem": imagem_uri,
+        "cor_fundo": COR_FUNDO,
+        "cor_slate": COR_SLATE,
+        "cor_dourado": COR_DOURADO,
+        "cor_linha": COR_LINHA,
         "fonte_manrope": fonte_local("Manrope", "Manrope-Regular.ttf"),
         "fonte_manrope_semibold": fonte_local("Manrope", "Manrope-SemiBold.ttf"),
     }
@@ -830,6 +842,7 @@ def gerar_encerramento_pdf_bytes():
         "cor_claro": COR_CLARO,
         "cor_slate": COR_SLATE,
         "cor_dourado": COR_DOURADO,
+        "cor_linha": COR_LINHA,
         "fonte_cormorant": fonte_local("Cormorant Garamond", "CormorantGaramond-Medium.ttf"),
         "fonte_cormorant_semibold": fonte_local("Cormorant Garamond", "CormorantGaramond-SemiBold.ttf"),
         "fonte_manrope": fonte_local("Manrope", "Manrope-Regular.ttf"),
@@ -873,10 +886,11 @@ def processar_documento(service, arquivo, codigo_imovel):
         raise ValueError("Arquivo baixado sem conteúdo.")
 
     if mime == "application/pdf" or extensao == ".pdf":
-        reader = PdfReader(io.BytesIO(conteudo))
+        pdf_normalizado = normalizar_pdf_para_a4(conteudo)
+        reader = PdfReader(io.BytesIO(pdf_normalizado))
         if len(reader.pages) == 0:
             raise ValueError("PDF sem páginas.")
-        return conteudo, len(reader.pages)
+        return pdf_normalizado, len(reader.pages)
 
     if extensao in {".jpg", ".jpeg", ".png", ".webp"}:
         pdf_bytes = gerar_pagina_imagem_pdf_bytes(conteudo, codigo_imovel)
