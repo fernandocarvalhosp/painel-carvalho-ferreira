@@ -213,7 +213,7 @@ def executar_gerador_pdf(codigo_imovel):
 
 def executar_gerador_dossie(codigo_imovel, dados_imovel):
     if gerador_dossie is None:
-        return False, "Módulo gerador_dossie não encontrado."
+        return False, None, {"mensagem": "Módulo gerador_dossie não encontrado."}
     try:
         importlib.reload(gerador_dossie)
         pdf_bytes, resultado = gerador_dossie.gerar_dossie_bytes(
@@ -222,9 +222,9 @@ def executar_gerador_dossie(codigo_imovel, dados_imovel):
         )
         if pdf_bytes and isinstance(pdf_bytes, (bytes, bytearray)) and len(pdf_bytes) > 100:
             return True, pdf_bytes, resultado
-        return False, None, resultado.get("mensagem", "Falha ao gerar o Dossiê.")
+        return False, None, resultado if isinstance(resultado, dict) else {"mensagem": "Falha ao gerar o Dossiê."}
     except Exception as e:
-        return False, None, f"Erro ao gerar Dossiê Documental: {e}"
+        return False, None, {"mensagem": f"Erro ao gerar Dossiê Documental: {e}"}
 
 
 def executar_gerador_posts(codigo_imovel):
@@ -446,7 +446,7 @@ if st.session_state.get("fotos_tratadas_zip"):
     )
 
 # =============================================================================
-# BOTÃO DE DOSSÍÊ DOCUMENTAL NA SIDEBAR (SEÇÃO CONFIDENCIAL)
+# BOTÃO DE DOSSIÊ DOCUMENTAL NA SIDEBAR (SEÇÃO CONFIDENCIAL)
 # =============================================================================
 st.sidebar.markdown("---")
 if st.sidebar.button("📄 Gerar Dossiê Documental", use_container_width=True, key="btn_dossie"):
@@ -460,7 +460,7 @@ if st.sidebar.button("📄 Gerar Dossiê Documental", use_container_width=True, 
             st.session_state["dossie_nome"] = info_res.get("nome_arquivo", f"Dossie_{codigo_busca}.pdf")
             st.sidebar.success(info_res.get("mensagem", "Dossiê gerado com sucesso!"))
         else:
-            st.sidebar.error(info_res if isinstance(info_res, str) else info_res.get("mensagem", "Erro ao gerar Dossiê."))
+            st.sidebar.error(info_res.get("mensagem", "Erro ao gerar Dossiê.") if isinstance(info_res, dict) else str(info_res))
 
 if st.session_state.get("dossie_bytes"):
     st.sidebar.download_button(
