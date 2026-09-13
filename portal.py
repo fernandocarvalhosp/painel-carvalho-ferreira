@@ -1,8 +1,13 @@
-# portal.py
+# portal_B.py
 # -*- coding: utf-8 -*-
 """
-Carvalho Ferreira | Portal Público
-FASE 1 + FASE 2: Publicar / Destaque / Ordem + Home limpa
+Carvalho Ferreira | Portal Público — VERSÃO B
+Backup da estável: portal_A.py
+
+- Colunas completas da planilha
+- Página do imóvel com mais dados
+- Fotos a partir da pasta da miniatura (opção B)
+- CTA para contato (mais fotos / vídeo / material)
 """
 
 import io
@@ -14,6 +19,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 import base64
 import math
+import unicodedata
 
 # =============================================================================
 # CONFIGURAÇÃO
@@ -39,6 +45,7 @@ TELEFONE_VALDIR = "5512992157474"
 
 ITENS_POR_PAGINA = 6
 MAX_DESTAQUES = 6
+MAX_FOTOS_DETALHE = 6  # limite para não deixar a página pesada
 
 # =============================================================================
 # ESTILO
@@ -69,11 +76,7 @@ st.markdown(
     div[data-testid="stVerticalBlock"] > div { gap: 0.35rem !important; }
     .element-container { margin-bottom: 0 !important; }
 
-    /* ===== MARCA ===== */
-    .brand-header {
-        text-align: center;
-        padding: 0.15rem 0 0.4rem 0;
-    }
+    .brand-header { text-align: center; padding: 0.15rem 0 0.4rem 0; }
     .brand-title {
         font-size: 1.3rem !important;
         font-weight: 600 !important;
@@ -99,7 +102,6 @@ st.markdown(
         opacity: 0.9;
     }
 
-    /* ===== MENU ===== */
     div[data-testid="stHorizontalBlock"] button {
         background: transparent !important;
         border: none !important;
@@ -127,7 +129,6 @@ st.markdown(
         margin: 0.25rem 0 1.2rem 0;
     }
 
-    /* ===== BUSCA ===== */
     .stTextInput > div > div > input {
         background-color: #111827 !important;
         border: 1px solid #1F2937 !important;
@@ -141,7 +142,6 @@ st.markdown(
         box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.25) !important;
     }
 
-    /* ===== TÍTULOS ===== */
     .section-title {
         font-size: 1rem !important;
         font-weight: 600 !important;
@@ -156,7 +156,6 @@ st.markdown(
         font-weight: 400;
     }
 
-    /* ===== CARDS ===== */
     .imovel-card {
         background-color: #111827;
         border: 1px solid #1F2937;
@@ -243,7 +242,6 @@ st.markdown(
         margin-bottom: 10px;
     }
 
-    /* Botão único do card */
     .stButton > button {
         border-radius: 6px !important;
         font-weight: 600 !important;
@@ -262,7 +260,22 @@ st.markdown(
         color: #fff !important;
     }
 
-    /* ===== CARROSSEL DESTAQUES ===== */
+    .stLinkButton > button {
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        background-color: #0B0F14 !important;
+        color: #F7F5F0 !important;
+        border: 1px solid #1F2937 !important;
+        width: 100% !important;
+        font-size: 0.8rem !important;
+        padding: 0.5rem 0.5rem !important;
+    }
+    .stLinkButton > button:hover {
+        background-color: #111827 !important;
+        border-color: #D4AF37 !important;
+        color: #fff !important;
+    }
+
     .destaque-card {
         background-color: #111827;
         border: 1px solid #1F2937;
@@ -290,7 +303,6 @@ st.markdown(
         margin-bottom: 12px;
     }
 
-    /* ===== PAGINAÇÃO ===== */
     .paginacao-info {
         text-align: center;
         font-size: 0.8rem;
@@ -298,7 +310,6 @@ st.markdown(
         margin: 1rem 0 0.5rem 0;
     }
 
-    /* ===== RODAPÉ ===== */
     .footer-cf {
         text-align: center;
         margin-top: 2.5rem;
@@ -319,7 +330,7 @@ st.markdown(
         opacity: 0.75;
     }
 
-    /* ===== PÁGINA DO IMÓVEL ===== */
+    /* Página do imóvel */
     .detalhe-codigo {
         font-size: 0.75rem;
         font-weight: 600;
@@ -332,8 +343,14 @@ st.markdown(
         font-size: 1.35rem;
         font-weight: 600;
         color: #F7F5F0;
-        margin-bottom: 6px;
+        margin-bottom: 4px;
         line-height: 1.3;
+    }
+    .detalhe-subtitulo {
+        font-size: 1rem;
+        color: #D4AF37;
+        margin-bottom: 6px;
+        font-weight: 500;
     }
     .detalhe-local {
         font-size: 0.9rem;
@@ -344,12 +361,13 @@ st.markdown(
         font-size: 1.6rem;
         font-weight: 700;
         color: #D4AF37;
-        margin: 1rem 0 0.6rem 0;
+        margin: 1rem 0 0.5rem 0;
     }
     .detalhe-specs {
-        font-size: 0.95rem;
+        font-size: 0.92rem;
         color: #F7F5F0;
-        margin-bottom: 1.4rem;
+        margin-bottom: 0.4rem;
+        line-height: 1.5;
     }
     .detalhe-secao {
         font-size: 0.78rem;
@@ -357,13 +375,32 @@ st.markdown(
         letter-spacing: 1.5px;
         color: #6B7280;
         text-transform: uppercase;
-        margin: 1.6rem 0 0.7rem 0;
+        margin: 1.5rem 0 0.6rem 0;
+    }
+    .detalhe-texto {
+        font-size: 0.92rem;
+        color: #D1D5DB;
+        line-height: 1.55;
+        margin-bottom: 0.8rem;
+    }
+    .detalhe-cta-texto {
+        color: #9CA3AF;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin-bottom: 1rem;
     }
     .detalhe-foto {
         width: 100%;
         border-radius: 10px;
         object-fit: cover;
-        max-height: 420px;
+        max-height: 380px;
+        margin-bottom: 8px;
+    }
+    .galeria-item img {
+        width: 100%;
+        border-radius: 8px;
+        object-fit: cover;
+        height: 160px;
     }
 
     @media (max-width: 768px) {
@@ -373,13 +410,13 @@ st.markdown(
             letter-spacing: 1px !important;
         }
         .foto-container-relativo img { height: 175px !important; }
-        .detalhe-foto { max-height: 280px; }
+        .detalhe-foto { max-height: 260px; }
+        .galeria-item img { height: 120px; }
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
-
 
 # =============================================================================
 # GOOGLE
@@ -397,12 +434,9 @@ def conectar_google():
 
 
 def normalizar(texto):
-    """Remove acentos, espaços extras e deixa em maiúsculo para comparação."""
     if not texto:
         return ""
-    import unicodedata
     texto = str(texto).strip().upper()
-    # Remove acentos (OÁSIS → OASIS, INDEPENDÊNCIA → INDEPENDENCIA)
     texto = "".join(
         c for c in unicodedata.normalize("NFD", texto)
         if unicodedata.category(c) != "Mn"
@@ -410,11 +444,16 @@ def normalizar(texto):
     return " ".join(texto.split())
 
 
-
 def eh_sim(valor):
-    """Aceita SIM, S, YES, 1, TRUE, X etc."""
     v = normalizar(valor)
     return v in ("SIM", "S", "YES", "Y", "1", "TRUE", "X", "VERDADEIRO")
+
+
+def pegar(dados, *chaves, default=""):
+    for c in chaves:
+        if c in dados and str(dados[c]).strip():
+            return str(dados[c]).strip()
+    return default
 
 
 @st.cache_data(ttl=300)
@@ -442,35 +481,10 @@ def carregar_imoveis_sheets():
 
             dados = {cabecalho[i]: row[i] for i in range(len(cabecalho))}
 
-            codigo = dados.get("CODIGO") or dados.get("CÓDIGO") or row[0]
-            tipo = dados.get("TIPO") or dados.get("CATEGORIA") or "Imóvel"
-            bairro = dados.get("BAIRRO") or ""
-            cidade = dados.get("CIDADE") or ""
-            valor = dados.get("VALOR") or "Sob consulta"
-            quartos = dados.get("QUARTOS") or dados.get("DORMS") or dados.get("DORMITORIOS") or ""
-            vagas = dados.get("VAGAS") or dados.get("GARAGEM") or ""
-            area_util = dados.get("AREA UTIL") or dados.get("ÁREA ÚTIL") or ""
-            status = dados.get("STATUS") or "Disponível"
-            miniatura_id = dados.get("MINIATURA") or dados.get("FOTO") or ""
-
-            # Novas colunas de controle do portal
-            publicar = (
-                dados.get("PUBLICAR NO PORTAL")
-                or dados.get("PUBLICAR")
-                or dados.get("PUBLICAR PORTAL")
-                or ""
-            )
-            destaque = (
-                dados.get("DESTAQUE")
-                or dados.get("DESTAQUES")
-                or ""
-            )
-            ordem_raw = (
-                dados.get("ORDEM DE DESTAQUE")
-                or dados.get("ORDEM DESTAQUE")
-                or dados.get("ORDEM")
-                or "999"
-            )
+            codigo = pegar(dados, "CODIGO", "CÓDIGO") or row[0]
+            publicar = pegar(dados, "PUBLICAR NO PORTAL", "PUBLICAR", "PUBLICAR PORTAL")
+            destaque = pegar(dados, "DESTAQUE", "DESTAQUES")
+            ordem_raw = pegar(dados, "ORDEM DE DESTAQUE", "ORDEM DESTAQUE", "ORDEM", default="999")
             try:
                 ordem = int("".join(filter(str.isdigit, str(ordem_raw))) or "999")
             except Exception:
@@ -478,18 +492,31 @@ def carregar_imoveis_sheets():
 
             imoveis.append({
                 "codigo": codigo,
-                "tipo": tipo,
-                "bairro": bairro,
-                "cidade": cidade,
-                "valor": valor,
-                "quartos": quartos,
-                "vagas": vagas,
-                "area_util": area_util,
-                "status": status,
-                "miniatura_id": miniatura_id.strip(),
                 "publicar": eh_sim(publicar),
                 "destaque": eh_sim(destaque),
                 "ordem": ordem,
+                "tipo": pegar(dados, "TIPO", "CATEGORIA", default="Imóvel"),
+                "cidade": pegar(dados, "CIDADE"),
+                "bairro": pegar(dados, "BAIRRO"),
+                "endereco": pegar(dados, "ENDERECO", "ENDEREÇO"),
+                "valor": pegar(dados, "VALOR", default="Sob consulta"),
+                "status": pegar(dados, "STATUS", default="Disponível"),
+                "miniatura_id": pegar(dados, "MINIATURA", "FOTO"),
+                "dormitorios": pegar(dados, "DORMITORIOS", "DORMITÓRIOS", "QUARTOS", "DORMS"),
+                "banheiros": pegar(dados, "BANHEIROS"),
+                "suites": pegar(dados, "SUITES", "SUÍTES"),
+                "vagas": pegar(dados, "VAGAS", "GARAGEM"),
+                "area_util": pegar(dados, "AREA UTIL", "ÁREA ÚTIL"),
+                "area_total": pegar(dados, "AREA TOTAL", "ÁREA TOTAL", "AREA DO TERRENO"),
+                "andar": pegar(dados, "ANDAR"),
+                "iptu": pegar(dados, "IPTU"),
+                "condominio": pegar(dados, "CONDOMINIO", "CONDOMÍNIO"),
+                "titulo_01": pegar(dados, "TITULO 01", "TÍTULO 01", "TITULO01"),
+                "titulo_02": pegar(dados, "TITULO 02", "TÍTULO 02", "TITULO02"),
+                "titulo_03": pegar(dados, "TITULO 03", "TÍTULO 03", "TITULO03"),
+                "descricao": pegar(dados, "DESCRICAO", "DESCRIÇÃO"),
+                "legenda_01": pegar(dados, "LEGENDA 01", "LEGENDA01"),
+                "legenda_02": pegar(dados, "LEGENDA 02", "LEGENDA02"),
             })
 
         return imoveis
@@ -516,6 +543,56 @@ def obter_foto_miniatura_por_id(file_id):
         return None
 
 
+@st.cache_data(ttl=600)
+def listar_fotos_pasta_miniatura(file_id, limite=MAX_FOTOS_DETALHE):
+    """
+    A partir do ID de um arquivo de miniatura, descobre a pasta pai
+    e retorna até `limite` imagens dessa pasta (bytes).
+    """
+    if not file_id or len(str(file_id).strip()) < 10:
+        return []
+    try:
+        drive, _ = conectar_google()
+        meta = drive.files().get(
+            fileId=file_id.strip(),
+            fields="id, parents, mimeType",
+        ).execute()
+
+        parents = meta.get("parents") or []
+        if not parents:
+            # Se o próprio ID for pasta, lista dentro dela
+            mime = meta.get("mimeType", "")
+            if "folder" in mime:
+                folder_id = file_id.strip()
+            else:
+                # só o arquivo isolado
+                data = obter_foto_miniatura_por_id(file_id)
+                return [data] if data else []
+        else:
+            folder_id = parents[0]
+
+        result = drive.files().list(
+            q=(
+                f"'{folder_id}' in parents and trashed = false and "
+                f"(mimeType contains 'image/' or mimeType = 'image/jpeg' or mimeType = 'image/png')"
+            ),
+            fields="files(id, name, mimeType)",
+            orderBy="name",
+            pageSize=limite,
+        ).execute()
+
+        files = result.get("files", [])[:limite]
+        fotos = []
+        for f in files:
+            data = obter_foto_miniatura_por_id(f["id"])
+            if data:
+                fotos.append(data)
+        return fotos
+    except Exception:
+        data = obter_foto_miniatura_por_id(file_id)
+        return [data] if data else []
+
+
 # =============================================================================
 # ESTADO
 # =============================================================================
@@ -529,7 +606,6 @@ if "idx_destaque" not in st.session_state:
 if "imovel_selecionado" not in st.session_state:
     st.session_state["imovel_selecionado"] = None
 
-
 # =============================================================================
 # LOGO
 # =============================================================================
@@ -540,8 +616,6 @@ def encontrar_logo():
         Path("marca/Logo/logo.png"),
         Path("marca/logo.png"),
         Path("marca/Logo.png"),
-        Path("marca/logo/Logo.png"),
-        Path("marca/Logo/Logo.png"),
     ]
     for pasta in [Path("marca/logo"), Path("marca/Logo")]:
         if pasta.exists() and pasta.is_dir():
@@ -595,14 +669,13 @@ for i, cat_nome in enumerate(categorias):
             st.session_state["pagina"] = 1
             st.session_state["idx_destaque"] = 0
             st.session_state["busca_portal"] = ""
-            st.session_state["imovel_selecionado"] = None  # sai da página do imóvel
+            st.session_state["imovel_selecionado"] = None
             st.rerun()
-
 
 st.markdown('<hr class="thin-divider">', unsafe_allow_html=True)
 
 # =============================================================================
-# BUSCA (mais humana)
+# BUSCA
 # =============================================================================
 
 if "busca_portal" not in st.session_state:
@@ -615,7 +688,6 @@ busca = st.text_input(
     key="busca_portal",
 )
 
-
 # =============================================================================
 # DADOS
 # =============================================================================
@@ -626,11 +698,10 @@ if not lista_imoveis:
     st.warning("Nenhum imóvel encontrado no momento.")
     st.stop()
 
-# Só imóveis autorizados a aparecer no portal
 imoveis_publicos = [i for i in lista_imoveis if i["publicar"]]
 
 # =============================================================================
-# PÁGINA DO IMÓVEL (quando um código está selecionado)
+# PÁGINA DO IMÓVEL
 # =============================================================================
 
 codigo_sel = st.session_state.get("imovel_selecionado")
@@ -648,41 +719,72 @@ if codigo_sel:
             st.rerun()
         st.stop()
 
-    # Botão voltar
     if st.button("← Voltar", key="btn_voltar_detalhe"):
         st.session_state["imovel_selecionado"] = None
         st.rerun()
 
-    st.markdown('<div style="height:0.6rem"></div>', unsafe_allow_html=True)
+    st.markdown('<div style="height:0.5rem"></div>', unsafe_allow_html=True)
 
-    # Código + título + local
+    # Código
     st.markdown(
         f'<div class="detalhe-codigo">Cód. {imovel["codigo"]}</div>',
         unsafe_allow_html=True,
     )
-    st.markdown(
-        f'<div class="detalhe-titulo">{imovel["tipo"]}</div>',
-        unsafe_allow_html=True,
-    )
-    local = imovel["bairro"]
-    if imovel["cidade"]:
-        local += f" · {imovel['cidade']}"
-    st.markdown(
-        f'<div class="detalhe-local">{local}</div>',
-        unsafe_allow_html=True,
-    )
 
-    # Foto principal
-    foto_bytes = obter_foto_miniatura_por_id(imovel["miniatura_id"])
-    if foto_bytes:
-        encoded = base64.b64encode(foto_bytes).decode("utf-8")
+    # Títulos (como no PDF)
+    titulo_principal = imovel["titulo_01"] or imovel["tipo"]
+    st.markdown(
+        f'<div class="detalhe-titulo">{titulo_principal}</div>',
+        unsafe_allow_html=True,
+    )
+    if imovel["titulo_02"]:
         st.markdown(
-            f'<img class="detalhe-foto" src="data:image/jpeg;base64,{encoded}" />',
+            f'<div class="detalhe-subtitulo">{imovel["titulo_02"]}</div>',
             unsafe_allow_html=True,
         )
+    if imovel["titulo_03"]:
+        st.markdown(
+            f'<div class="detalhe-local" style="color:#9CA3AF;margin-bottom:0.4rem;">{imovel["titulo_03"]}</div>',
+            unsafe_allow_html=True,
+        )
+
+    # Local
+    local_parts = [p for p in [imovel["bairro"], imovel["cidade"]] if p]
+    if imovel["endereco"]:
+        local_parts.insert(0, imovel["endereco"])
+    if local_parts:
+        st.markdown(
+            f'<div class="detalhe-local">{" · ".join(local_parts)}</div>',
+            unsafe_allow_html=True,
+        )
+
+    # Fotos da pasta da miniatura
+    with st.spinner("Carregando fotos..."):
+        fotos = listar_fotos_pasta_miniatura(imovel["miniatura_id"], limite=MAX_FOTOS_DETALHE)
+
+    if fotos:
+        # Foto principal (primeira)
+        encoded0 = base64.b64encode(fotos[0]).decode("utf-8")
+        st.markdown(
+            f'<img class="detalhe-foto" src="data:image/jpeg;base64,{encoded0}" />',
+            unsafe_allow_html=True,
+        )
+        # Demais em grade
+        if len(fotos) > 1:
+            resto = fotos[1:]
+            for i in range(0, len(resto), 3):
+                grupo = resto[i : i + 3]
+                cols = st.columns(len(grupo))
+                for j, foto in enumerate(grupo):
+                    with cols[j]:
+                        enc = base64.b64encode(foto).decode("utf-8")
+                        st.markdown(
+                            f'<div class="galeria-item"><img src="data:image/jpeg;base64,{enc}" /></div>',
+                            unsafe_allow_html=True,
+                        )
     else:
         st.markdown(
-            '<div style="background:#111827;height:320px;display:flex;align-items:center;justify-content:center;color:#6B7280;border-radius:10px;border:1px solid #1F2937;">Foto em breve</div>',
+            '<div style="background:#111827;height:280px;display:flex;align-items:center;justify-content:center;color:#6B7280;border-radius:10px;border:1px solid #1F2937;">Foto em breve</div>',
             unsafe_allow_html=True,
         )
 
@@ -693,35 +795,79 @@ if codigo_sel:
     )
 
     # Características
-    partes = []
+    specs = []
     if imovel["area_util"]:
-        partes.append(f"{imovel['area_util']} úteis")
-    if imovel["quartos"]:
-        partes.append(f"{imovel['quartos']} dormitórios")
+        specs.append(f"{imovel['area_util']} úteis")
+    if imovel["area_total"]:
+        specs.append(f"{imovel['area_total']} totais")
+    if imovel["dormitorios"]:
+        specs.append(f"{imovel['dormitorios']} dormitórios")
+    if imovel["suites"]:
+        specs.append(f"{imovel['suites']} suíte(s)")
+    if imovel["banheiros"]:
+        specs.append(f"{imovel['banheiros']} banheiros")
     if imovel["vagas"]:
-        partes.append(f"{imovel['vagas']} vaga(s)")
-    if partes:
+        specs.append(f"{imovel['vagas']} vaga(s)")
+    if imovel["andar"]:
+        specs.append(f"Andar {imovel['andar']}")
+
+    if specs:
         st.markdown(
-            f'<div class="detalhe-specs">{" · ".join(partes)}</div>',
+            f'<div class="detalhe-specs">{" · ".join(specs)}</div>',
             unsafe_allow_html=True,
         )
 
+    custos = []
+    if imovel["iptu"]:
+        custos.append(f"IPTU {imovel['iptu']}")
+    if imovel["condominio"]:
+        custos.append(f"Cond. {imovel['condominio']}")
+    if custos:
+        st.markdown(
+            f'<div class="detalhe-specs" style="color:#9CA3AF;font-size:0.88rem;">{" · ".join(custos)}</div>',
+            unsafe_allow_html=True,
+        )
+
+    # Descrição
+    if imovel["descricao"]:
+        st.markdown('<div class="detalhe-secao">Sobre o imóvel</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="detalhe-texto">{imovel["descricao"]}</div>',
+            unsafe_allow_html=True,
+        )
+
+    if imovel["legenda_01"] or imovel["legenda_02"]:
+        st.markdown('<div class="detalhe-secao">Destaques</div>', unsafe_allow_html=True)
+        if imovel["legenda_01"]:
+            st.markdown(
+                f'<div class="detalhe-texto">{imovel["legenda_01"]}</div>',
+                unsafe_allow_html=True,
+            )
+        if imovel["legenda_02"]:
+            st.markdown(
+                f'<div class="detalhe-texto">{imovel["legenda_02"]}</div>',
+                unsafe_allow_html=True,
+            )
+
     st.markdown('<hr class="thin-divider">', unsafe_allow_html=True)
 
-    # CTA de conversão
+    # CTA — funil de contato
+    st.markdown('<div class="detalhe-secao">Gostou deste imóvel?</div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="detalhe-secao">Interessou?</div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        '<div style="color:#6B7280;font-size:0.88rem;margin-bottom:0.9rem;">Fale com um de nossos consultores e tire todas as suas dúvidas.</div>',
+        """
+        <div class="detalhe-cta-texto">
+            Quer mais fotos, vídeo ou o material completo?<br>
+            Fale com um de nossos consultores. Vamos entender o que você busca
+            e enviar o que faz sentido para você.
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
     msg_whats = (
         f"Olá, tenho interesse no imóvel {imovel['codigo']} "
         f"({imovel['tipo']} em {imovel['bairro']}). "
-        f"Gostaria de mais informações."
+        f"Gostaria de mais informações, fotos e material completo."
     )
     link_wf = f"https://wa.me/{TELEFONE_FERNANDO}?text={urllib.parse.quote(msg_whats)}"
     link_wv = f"https://wa.me/{TELEFONE_VALDIR}?text={urllib.parse.quote(msg_whats)}"
@@ -732,7 +878,6 @@ if codigo_sel:
     with c2:
         st.link_button("Valdir Ferreira", link_wv, use_container_width=True)
 
-    # Rodapé da página de detalhe
     st.markdown(
         """
         <div class="footer-cf">
@@ -742,10 +887,10 @@ if codigo_sel:
         """,
         unsafe_allow_html=True,
     )
-    st.stop()  # não renderiza a listagem
+    st.stop()
 
 # =============================================================================
-# FILTRAGEM (listagem / carrossel)
+# FILTRAGEM (listagem)
 # =============================================================================
 
 cat_ativa = st.session_state["cat"]
@@ -755,7 +900,9 @@ if busca and busca.strip():
     termo = normalizar(busca)
     imoveis_exibidos = [
         i for i in imoveis_publicos
-        if termo in normalizar(f"{i['codigo']} {i['tipo']} {i['bairro']} {i['cidade']}")
+        if termo in normalizar(
+            f"{i['codigo']} {i['tipo']} {i['bairro']} {i['cidade']} {i['titulo_01']}"
+        )
     ]
     titulo_secao = "Resultado da busca"
     st.session_state["pagina"] = 1
@@ -763,7 +910,7 @@ else:
     if cat_ativa == "DESTAQUES":
         imoveis_exibidos = sorted(
             [i for i in imoveis_publicos if i["destaque"]],
-            key=lambda x: x["ordem"]
+            key=lambda x: x["ordem"],
         )[:MAX_DESTAQUES]
         titulo_secao = "Destaques"
     elif cat_ativa == "CASAS":
@@ -784,7 +931,7 @@ else:
     elif cat_ativa == "COMERCIAIS":
         imoveis_exibidos = [
             i for i in imoveis_publicos
-            if any(x in normalizar(i["tipo"]) for x in ["COMERCIAL", "SALA", "GALPÃO", "GALPAO"])
+            if any(x in normalizar(i["tipo"]) for x in ["COMERCIAL", "SALA", "GALPAO", "GALPÃO"])
         ]
         titulo_secao = "Comerciais"
 
@@ -800,19 +947,17 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-
 # =============================================================================
-# RENDER
+# RENDER LISTAGEM
 # =============================================================================
 
 def render_card(imovel, key_suffix=""):
-    """Card limpo com um único botão."""
     st.markdown('<div class="imovel-card">', unsafe_allow_html=True)
 
     st_normal = normalizar(imovel["status"])
-    if "NEGOCIAÇÃO" in st_normal or "NEGOCIACAO" in st_normal:
+    if "NEGOCIACAO" in st_normal or "NEGOCIAÇÃO" in st_normal:
         badge_classe, badge_texto = "status-negociacao", "EM NEGOCIAÇÃO"
-    elif any(x in st_normal for x in ["VENDIDO", "LOCADO", "INDISPONÍVEL", "INDISPONIVEL"]):
+    elif any(x in st_normal for x in ["VENDIDO", "LOCADO", "INDISPONIVEL", "INDISPONÍVEL"]):
         badge_classe, badge_texto = "status-vendido", imovel["status"].upper()
     else:
         badge_classe, badge_texto = "status-disponivel", "DISPONÍVEL"
@@ -849,8 +994,8 @@ def render_card(imovel, key_suffix=""):
     st.markdown(f'<div class="info-sub">{local}</div>', unsafe_allow_html=True)
 
     partes = [imovel["tipo"]]
-    if imovel["quartos"]:
-        partes.append(f"{imovel['quartos']} Dorm.")
+    if imovel["dormitorios"]:
+        partes.append(f"{imovel['dormitorios']} Dorm.")
     if imovel["vagas"]:
         partes.append(f"{imovel['vagas']} Vaga(s)")
     if imovel["area_util"]:
@@ -864,11 +1009,9 @@ def render_card(imovel, key_suffix=""):
     st.markdown("</div>", unsafe_allow_html=True)
 
 
-
 if not imoveis_exibidos:
     st.info("Nenhum imóvel encontrado nesta categoria ou busca.")
 else:
-    # ----- DESTAQUES: visual de carrossel simples (1 em evidência + navegação) -----
     if cat_ativa == "DESTAQUES" and not (busca and busca.strip()):
         idx = st.session_state["idx_destaque"]
         if idx >= len(imoveis_exibidos):
@@ -877,7 +1020,6 @@ else:
 
         imovel = imoveis_exibidos[idx]
 
-        # Card central de destaque
         col_esq, col_centro, col_dir = st.columns([0.8, 2.4, 0.8])
         with col_centro:
             st.markdown('<div class="destaque-card">', unsafe_allow_html=True)
@@ -896,16 +1038,20 @@ else:
                 )
 
             st.markdown(f'<div class="destaque-preco">{imovel["valor"]}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="destaque-titulo">{imovel["tipo"]} · {imovel["bairro"]}</div>', unsafe_allow_html=True)
+            titulo_card = imovel["titulo_01"] or f"{imovel['tipo']} · {imovel['bairro']}"
+            st.markdown(f'<div class="destaque-titulo">{titulo_card}</div>', unsafe_allow_html=True)
 
             partes = []
             if imovel["area_util"]:
                 partes.append(f"{imovel['area_util']} úteis")
-            if imovel["quartos"]:
-                partes.append(f"{imovel['quartos']} dorm.")
+            if imovel["dormitorios"]:
+                partes.append(f"{imovel['dormitorios']} dorm.")
             if imovel["vagas"]:
                 partes.append(f"{imovel['vagas']} vaga(s)")
-            st.markdown(f'<div class="destaque-info">{" · ".join(partes) if partes else imovel["codigo"]}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="destaque-info">{" · ".join(partes) if partes else imovel["codigo"]}</div>',
+                unsafe_allow_html=True,
+            )
 
             if st.button("Ver imóvel", key=f"destaque_ver_{imovel['codigo']}", use_container_width=True):
                 st.session_state["imovel_selecionado"] = imovel["codigo"]
@@ -913,8 +1059,6 @@ else:
 
             st.markdown("</div>", unsafe_allow_html=True)
 
-
-        # Navegação do carrossel
         c1, c2, c3 = st.columns([1, 2, 1])
         with c1:
             if st.button("← Anterior", use_container_width=True, key="car_prev"):
@@ -925,7 +1069,6 @@ else:
                 st.session_state["idx_destaque"] = (idx + 1) % len(imoveis_exibidos)
                 st.rerun()
 
-        # Indicadores
         indicadores = "  ".join(
             ["●" if i == idx else "○" for i in range(len(imoveis_exibidos))]
         )
@@ -934,7 +1077,6 @@ else:
             unsafe_allow_html=True,
         )
 
-    # ----- CATEGORIAS / BUSCA: grade paginada -----
     else:
         total_paginas = max(1, math.ceil(total / ITENS_POR_PAGINA))
         pagina_atual = st.session_state["pagina"]
@@ -968,10 +1110,6 @@ else:
                     if st.button("Próxima →", use_container_width=True, key="pg_next"):
                         st.session_state["pagina"] = pagina_atual + 1
                         st.rerun()
-
-# =============================================================================
-# RODAPÉ
-# =============================================================================
 
 st.markdown(
     """
