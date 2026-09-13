@@ -699,7 +699,7 @@ logo_encontrado = encontrar_logo()
 if logo_encontrado:
     col_l, col_c, col_r = st.columns([1.5, 1, 1.5])
     with col_c:
-        st.image(str(logo_encontrado), width=100)
+        st.image(str(logo_encontrado), width=80)
     st.markdown(
         """
         <div class="brand-header">
