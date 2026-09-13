@@ -393,14 +393,48 @@ st.markdown(
         width: 100%;
         border-radius: 10px;
         object-fit: cover;
-        max-height: 380px;
+        max-height: 400px;
+        margin-bottom: 10px;
+    }
+    .galeria-item {
         margin-bottom: 8px;
     }
     .galeria-item img {
         width: 100%;
         border-radius: 8px;
         object-fit: cover;
-        height: 160px;
+        height: 200px;
+        display: block;
+    }
+    .detalhe-titulo-1 {
+        font-size: 0.82rem;
+        font-weight: 500;
+        color: #9CA3AF;
+        letter-spacing: 0.5px;
+        margin-bottom: 2px;
+    }
+    .detalhe-titulo-2 {
+        font-size: 1.45rem;
+        font-weight: 700;
+        color: #F7F5F0;
+        margin-bottom: 4px;
+        line-height: 1.25;
+    }
+    .detalhe-titulo-3 {
+        font-size: 1rem;
+        font-weight: 500;
+        color: #D4AF37;
+        margin-bottom: 8px;
+        line-height: 1.3;
+    }
+    .detalhe-obs {
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #D1D5DB;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        margin-bottom: 0.6rem;
+        line-height: 1.45;
     }
 
     @media (max-width: 768px) {
@@ -410,9 +444,11 @@ st.markdown(
             letter-spacing: 1px !important;
         }
         .foto-container-relativo img { height: 175px !important; }
-        .detalhe-foto { max-height: 260px; }
-        .galeria-item img { height: 120px; }
+        .detalhe-foto { max-height: 280px; }
+        .galeria-item img { height: 180px; }
+        .detalhe-titulo-2 { font-size: 1.25rem; }
     }
+
     </style>
     """,
     unsafe_allow_html=True,
@@ -515,9 +551,11 @@ def carregar_imoveis_sheets():
                 "titulo_02": pegar(dados, "TITULO 02", "TÍTULO 02", "TITULO02"),
                 "titulo_03": pegar(dados, "TITULO 03", "TÍTULO 03", "TITULO03"),
                 "descricao": pegar(dados, "DESCRICAO", "DESCRIÇÃO"),
+                "obs_extras": pegar(dados, "OBS EXTRAS", "OBSERVACOES EXTRAS", "OBS", "OBSERVACOES"),
                 "legenda_01": pegar(dados, "LEGENDA 01", "LEGENDA01"),
                 "legenda_02": pegar(dados, "LEGENDA 02", "LEGENDA02"),
             })
+
 
         return imoveis
     except Exception as e:
@@ -546,8 +584,10 @@ def obter_foto_miniatura_por_id(file_id):
 @st.cache_data(ttl=600)
 def listar_fotos_pasta_miniatura(file_id, limite=MAX_FOTOS_DETALHE):
     """
-    A partir do ID de um arquivo de miniatura, descobre a pasta pai
-    e retorna até `limite` imagens dessa pasta (bytes).
+    Usa APENAS imagens da pasta de miniaturas.
+    - Se o ID for um arquivo dentro de pasta cujo nome contém MINIATURA → lista as imagens dessa pasta
+    - Se o ID for a própria pasta MINIATURA → lista as imagens dentro dela
+    - Caso contrário → retorna só a miniatura cadastrada (não puxa fotos de outras pastas)
     """
     if not file_id or len(str(file_id).strip()) < 10:
         return []
@@ -555,28 +595,40 @@ def listar_fotos_pasta_miniatura(file_id, limite=MAX_FOTOS_DETALHE):
         drive, _ = conectar_google()
         meta = drive.files().get(
             fileId=file_id.strip(),
-            fields="id, parents, mimeType",
+            fields="id, name, parents, mimeType",
         ).execute()
 
-        parents = meta.get("parents") or []
-        if not parents:
-            # Se o próprio ID for pasta, lista dentro dela
-            mime = meta.get("mimeType", "")
-            if "folder" in mime:
+        mime = meta.get("mimeType", "")
+        folder_id = None
+
+        # Caso 1: o ID já é uma pasta
+        if "folder" in mime:
+            nome_pasta = normalizar(meta.get("name", ""))
+            if "MINIATURA" in nome_pasta:
                 folder_id = file_id.strip()
-            else:
-                # só o arquivo isolado
-                data = obter_foto_miniatura_por_id(file_id)
-                return [data] if data else []
         else:
-            folder_id = parents[0]
+            # Caso 2: arquivo — verifica se a pasta pai é de miniaturas
+            parents = meta.get("parents") or []
+            if parents:
+                parent = drive.files().get(
+                    fileId=parents[0],
+                    fields="id, name",
+                ).execute()
+                nome_pasta = normalizar(parent.get("name", ""))
+                if "MINIATURA" in nome_pasta:
+                    folder_id = parents[0]
+
+        # Se não estiver na pasta miniatura, usa só o arquivo cadastrado
+        if not folder_id:
+            data = obter_foto_miniatura_por_id(file_id)
+            return [data] if data else []
 
         result = drive.files().list(
             q=(
                 f"'{folder_id}' in parents and trashed = false and "
-                f"(mimeType contains 'image/' or mimeType = 'image/jpeg' or mimeType = 'image/png')"
+                f"mimeType contains 'image/'"
             ),
-            fields="files(id, name, mimeType)",
+            fields="files(id, name)",
             orderBy="name",
             pageSize=limite,
         ).execute()
@@ -587,7 +639,10 @@ def listar_fotos_pasta_miniatura(file_id, limite=MAX_FOTOS_DETALHE):
             data = obter_foto_miniatura_por_id(f["id"])
             if data:
                 fotos.append(data)
-        return fotos
+        return fotos if fotos else (
+            [obter_foto_miniatura_por_id(file_id)]
+            if obter_foto_miniatura_por_id(file_id) else []
+        )
     except Exception:
         data = obter_foto_miniatura_por_id(file_id)
         return [data] if data else []
@@ -731,20 +786,21 @@ if codigo_sel:
         unsafe_allow_html=True,
     )
 
-    # Títulos (como no PDF)
-    titulo_principal = imovel["titulo_01"] or imovel["tipo"]
-    st.markdown(
-        f'<div class="detalhe-titulo">{titulo_principal}</div>',
-        unsafe_allow_html=True,
-    )
-    if imovel["titulo_02"]:
+    # Hierarquia de títulos (como no PDF)
+    # Título 1 = linha menor | Título 2 = manchete principal | Título 3 = subtítulo
+    if imovel["titulo_01"]:
         st.markdown(
-            f'<div class="detalhe-subtitulo">{imovel["titulo_02"]}</div>',
+            f'<div class="detalhe-titulo-1">{imovel["titulo_01"]}</div>',
             unsafe_allow_html=True,
         )
+    titulo_principal = imovel["titulo_02"] or imovel["tipo"]
+    st.markdown(
+        f'<div class="detalhe-titulo-2">{titulo_principal}</div>',
+        unsafe_allow_html=True,
+    )
     if imovel["titulo_03"]:
         st.markdown(
-            f'<div class="detalhe-local" style="color:#9CA3AF;margin-bottom:0.4rem;">{imovel["titulo_03"]}</div>',
+            f'<div class="detalhe-titulo-3">{imovel["titulo_03"]}</div>',
             unsafe_allow_html=True,
         )
 
@@ -758,23 +814,23 @@ if codigo_sel:
             unsafe_allow_html=True,
         )
 
-    # Fotos da pasta da miniatura
+    # Fotos — somente da pasta MINIATURA
     with st.spinner("Carregando fotos..."):
         fotos = listar_fotos_pasta_miniatura(imovel["miniatura_id"], limite=MAX_FOTOS_DETALHE)
 
     if fotos:
-        # Foto principal (primeira)
+        # Principal
         encoded0 = base64.b64encode(fotos[0]).decode("utf-8")
         st.markdown(
             f'<img class="detalhe-foto" src="data:image/jpeg;base64,{encoded0}" />',
             unsafe_allow_html=True,
         )
-        # Demais em grade
+        # Demais em grade de 2 colunas (melhor proporção no PC e no celular)
         if len(fotos) > 1:
             resto = fotos[1:]
-            for i in range(0, len(resto), 3):
-                grupo = resto[i : i + 3]
-                cols = st.columns(len(grupo))
+            for i in range(0, len(resto), 2):
+                grupo = resto[i : i + 2]
+                cols = st.columns(2, gap="small")
                 for j, foto in enumerate(grupo):
                     with cols[j]:
                         enc = base64.b64encode(foto).decode("utf-8")
@@ -828,26 +884,32 @@ if codigo_sel:
             unsafe_allow_html=True,
         )
 
-    # Descrição
-    if imovel["descricao"]:
+    # Textos do anúncio (ordem do PDF: OBS EXTRAS → DESCRIÇÃO)
+    if imovel.get("obs_extras") or imovel["descricao"] or imovel["legenda_01"] or imovel["legenda_02"]:
         st.markdown('<div class="detalhe-secao">Sobre o imóvel</div>', unsafe_allow_html=True)
+
+    if imovel.get("obs_extras"):
+        st.markdown(
+            f'<div class="detalhe-obs">{imovel["obs_extras"]}</div>',
+            unsafe_allow_html=True,
+        )
+
+    if imovel["descricao"]:
         st.markdown(
             f'<div class="detalhe-texto">{imovel["descricao"]}</div>',
             unsafe_allow_html=True,
         )
 
-    if imovel["legenda_01"] or imovel["legenda_02"]:
-        st.markdown('<div class="detalhe-secao">Destaques</div>', unsafe_allow_html=True)
-        if imovel["legenda_01"]:
-            st.markdown(
-                f'<div class="detalhe-texto">{imovel["legenda_01"]}</div>',
-                unsafe_allow_html=True,
-            )
-        if imovel["legenda_02"]:
-            st.markdown(
-                f'<div class="detalhe-texto">{imovel["legenda_02"]}</div>',
-                unsafe_allow_html=True,
-            )
+    if imovel["legenda_01"]:
+        st.markdown(
+            f'<div class="detalhe-texto">{imovel["legenda_01"]}</div>',
+            unsafe_allow_html=True,
+        )
+    if imovel["legenda_02"]:
+        st.markdown(
+            f'<div class="detalhe-texto">{imovel["legenda_02"]}</div>',
+            unsafe_allow_html=True,
+        )
 
     st.markdown('<hr class="thin-divider">', unsafe_allow_html=True)
 
