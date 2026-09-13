@@ -533,6 +533,8 @@ for i, cat_nome in enumerate(categorias):
             st.session_state["cat"] = cat_nome
             st.session_state["pagina"] = 1
             st.session_state["idx_destaque"] = 0
+            # Limpa a busca ao trocar de categoria
+            st.session_state["busca_portal"] = ""
             st.rerun()
 
 st.markdown('<hr class="thin-divider">', unsafe_allow_html=True)
@@ -541,11 +543,16 @@ st.markdown('<hr class="thin-divider">', unsafe_allow_html=True)
 # BUSCA (mais humana)
 # =============================================================================
 
+if "busca_portal" not in st.session_state:
+    st.session_state["busca_portal"] = ""
+
 busca = st.text_input(
     "Buscar",
     placeholder="Procure por bairro, código ou tipo...",
     label_visibility="collapsed",
+    key="busca_portal",
 )
+
 
 # =============================================================================
 # DADOS
