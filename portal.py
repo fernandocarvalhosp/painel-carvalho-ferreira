@@ -486,31 +486,37 @@ def encontrar_logo():
     return None
 
 
-col_l, col_c, col_r = st.columns([1, 1.6, 1])
-with col_c:
-    logo_encontrado = encontrar_logo()
-    if logo_encontrado:
-        st.image(str(logo_encontrado), use_container_width=True)
-        st.markdown(
-            """
-            <div style="text-align:center; margin-top: -6px; margin-bottom: 4px;">
-                <div class="brand-subtitle" style="margin-top: 2px;">Consultoria Imobiliária</div>
-                <div class="brand-line"></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            """
-            <div class="brand-header">
-                <div class="brand-title">Carvalho Ferreira</div>
-                <div class="brand-subtitle">Consultoria Imobiliária</div>
-                <div class="brand-line"></div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+# Cabeçalho com logo em tamanho controlado + nome da marca
+logo_encontrado = encontrar_logo()
+
+if logo_encontrado:
+    # Centraliza o logo com largura fixa em pixels (ajuste esse número se quiser)
+    col_l, col_c, col_r = st.columns([1.5, 1, 1.5])
+    with col_c:
+        st.image(str(logo_encontrado), width=140)  # ← mude 140 para aumentar ou diminuir
+
+    st.markdown(
+        """
+        <div class="brand-header" style="padding-top: 0.15rem; padding-bottom: 0.25rem;">
+            <div class="brand-title" style="font-size: 1.3rem !important; letter-spacing: 4px;">Carvalho Ferreira</div>
+            <div class="brand-subtitle">Consultoria Imobiliária</div>
+            <div class="brand-line"></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        """
+        <div class="brand-header">
+            <div class="brand-title">Carvalho Ferreira</div>
+            <div class="brand-subtitle">Consultoria Imobiliária</div>
+            <div class="brand-line"></div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 
 
 # =============================================================================
