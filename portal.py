@@ -493,7 +493,7 @@ if logo_encontrado:
     # Centraliza o logo com largura fixa em pixels (ajuste esse número se quiser)
     col_l, col_c, col_r = st.columns([1.5, 1, 1.5])
     with col_c:
-        st.image(str(logo_encontrado), width=140)  # ← mude 140 para aumentar ou diminuir
+        st.image(str(logo_encontrado), width=120)  # ← mude 140 para aumentar ou diminuir
 
     st.markdown(
         """
