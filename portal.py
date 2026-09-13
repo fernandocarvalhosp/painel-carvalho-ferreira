@@ -348,9 +348,18 @@ def conectar_google():
 
 
 def normalizar(texto):
+    """Remove acentos, espaços extras e deixa em maiúsculo para comparação."""
     if not texto:
         return ""
-    return " ".join(str(texto).strip().upper().split())
+    import unicodedata
+    texto = str(texto).strip().upper()
+    # Remove acentos (OÁSIS → OASIS, INDEPENDÊNCIA → INDEPENDENCIA)
+    texto = "".join(
+        c for c in unicodedata.normalize("NFD", texto)
+        if unicodedata.category(c) != "Mn"
+    )
+    return " ".join(texto.split())
+
 
 
 def eh_sim(valor):
