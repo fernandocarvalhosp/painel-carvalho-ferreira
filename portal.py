@@ -491,7 +491,7 @@ logo_encontrado = encontrar_logo()
 
 if logo_encontrado:
     # Centraliza o logo com largura fixa em pixels (ajuste esse número se quiser)
-    col_l, col_c, col_r = st.columns([1, 1, 1.5])
+    col_l, col_c, col_r = st.columns([1, 0.5, 1.5])
     with col_c:
         st.image(str(logo_encontrado), width=120)  # ← mude 140 para aumentar ou diminuir
 
