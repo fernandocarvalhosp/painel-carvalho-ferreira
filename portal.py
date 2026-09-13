@@ -462,11 +462,44 @@ if "pagina" not in st.session_state:
 # CABEÇALHO DE MARCA
 # =============================================================================
 
-col_l, col_c, col_r = st.columns([1, 2.2, 1])
+def encontrar_logo():
+    """Procura o logo nos caminhos mais comuns da pasta marca."""
+    candidatos = [
+        Path("marca/logo/logo.png"),
+        Path("marca/Logo/logo.png"),
+        Path("marca/logo.png"),
+        Path("marca/Logo.png"),
+        Path("marca/logo/Logo.png"),
+        Path("marca/Logo/Logo.png"),
+    ]
+    # Também procura qualquer PNG dentro de marca/logo ou marca/Logo
+    for pasta in [Path("marca/logo"), Path("marca/Logo")]:
+        if pasta.exists() and pasta.is_dir():
+            for arq in pasta.glob("*.png"):
+                candidatos.append(arq)
+            for arq in pasta.glob("*.PNG"):
+                candidatos.append(arq)
+
+    for caminho in candidatos:
+        if caminho.exists() and caminho.is_file():
+            return caminho
+    return None
+
+
+col_l, col_c, col_r = st.columns([1, 1.6, 1])
 with col_c:
-    logo_path = Path("marca/logo.png")
-    if logo_path.exists():
-        st.image(str(logo_path), use_container_width=True)
+    logo_encontrado = encontrar_logo()
+    if logo_encontrado:
+        st.image(str(logo_encontrado), use_container_width=True)
+        st.markdown(
+            """
+            <div style="text-align:center; margin-top: -6px; margin-bottom: 4px;">
+                <div class="brand-subtitle" style="margin-top: 2px;">Consultoria Imobiliária</div>
+                <div class="brand-line"></div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     else:
         st.markdown(
             """
@@ -478,6 +511,7 @@ with col_c:
             """,
             unsafe_allow_html=True,
         )
+
 
 # =============================================================================
 # MENU DE NAVEGAÇÃO FINO
