@@ -319,6 +319,53 @@ st.markdown(
         opacity: 0.75;
     }
 
+    /* ===== PÁGINA DO IMÓVEL ===== */
+    .detalhe-codigo {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #6B7280;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+    }
+    .detalhe-titulo {
+        font-size: 1.35rem;
+        font-weight: 600;
+        color: #F7F5F0;
+        margin-bottom: 6px;
+        line-height: 1.3;
+    }
+    .detalhe-local {
+        font-size: 0.9rem;
+        color: #6B7280;
+        margin-bottom: 1.2rem;
+    }
+    .detalhe-preco {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #D4AF37;
+        margin: 1rem 0 0.6rem 0;
+    }
+    .detalhe-specs {
+        font-size: 0.95rem;
+        color: #F7F5F0;
+        margin-bottom: 1.4rem;
+    }
+    .detalhe-secao {
+        font-size: 0.78rem;
+        font-weight: 600;
+        letter-spacing: 1.5px;
+        color: #6B7280;
+        text-transform: uppercase;
+        margin: 1.6rem 0 0.7rem 0;
+    }
+    .detalhe-foto {
+        width: 100%;
+        border-radius: 10px;
+        object-fit: cover;
+        max-height: 420px;
+    }
+
     @media (max-width: 768px) {
         .brand-title { font-size: 1.15rem !important; letter-spacing: 3px; }
         div[data-testid="stHorizontalBlock"] button {
@@ -326,11 +373,13 @@ st.markdown(
             letter-spacing: 1px !important;
         }
         .foto-container-relativo img { height: 175px !important; }
+        .detalhe-foto { max-height: 280px; }
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
+
 
 # =============================================================================
 # GOOGLE
@@ -477,6 +526,9 @@ if "pagina" not in st.session_state:
     st.session_state["pagina"] = 1
 if "idx_destaque" not in st.session_state:
     st.session_state["idx_destaque"] = 0
+if "imovel_selecionado" not in st.session_state:
+    st.session_state["imovel_selecionado"] = None
+
 
 # =============================================================================
 # LOGO
@@ -542,9 +594,10 @@ for i, cat_nome in enumerate(categorias):
             st.session_state["cat"] = cat_nome
             st.session_state["pagina"] = 1
             st.session_state["idx_destaque"] = 0
-            # Limpa a busca ao trocar de categoria
             st.session_state["busca_portal"] = ""
+            st.session_state["imovel_selecionado"] = None  # sai da página do imóvel
             st.rerun()
+
 
 st.markdown('<hr class="thin-divider">', unsafe_allow_html=True)
 
@@ -577,7 +630,122 @@ if not lista_imoveis:
 imoveis_publicos = [i for i in lista_imoveis if i["publicar"]]
 
 # =============================================================================
-# FILTRAGEM
+# PÁGINA DO IMÓVEL (quando um código está selecionado)
+# =============================================================================
+
+codigo_sel = st.session_state.get("imovel_selecionado")
+
+if codigo_sel:
+    imovel = next(
+        (i for i in imoveis_publicos if normalizar(i["codigo"]) == normalizar(str(codigo_sel))),
+        None,
+    )
+
+    if not imovel:
+        st.warning("Imóvel não encontrado ou não disponível no portal.")
+        if st.button("← Voltar"):
+            st.session_state["imovel_selecionado"] = None
+            st.rerun()
+        st.stop()
+
+    # Botão voltar
+    if st.button("← Voltar", key="btn_voltar_detalhe"):
+        st.session_state["imovel_selecionado"] = None
+        st.rerun()
+
+    st.markdown('<div style="height:0.6rem"></div>', unsafe_allow_html=True)
+
+    # Código + título + local
+    st.markdown(
+        f'<div class="detalhe-codigo">Cód. {imovel["codigo"]}</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'<div class="detalhe-titulo">{imovel["tipo"]}</div>',
+        unsafe_allow_html=True,
+    )
+    local = imovel["bairro"]
+    if imovel["cidade"]:
+        local += f" · {imovel['cidade']}"
+    st.markdown(
+        f'<div class="detalhe-local">{local}</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Foto principal
+    foto_bytes = obter_foto_miniatura_por_id(imovel["miniatura_id"])
+    if foto_bytes:
+        encoded = base64.b64encode(foto_bytes).decode("utf-8")
+        st.markdown(
+            f'<img class="detalhe-foto" src="data:image/jpeg;base64,{encoded}" />',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            '<div style="background:#111827;height:320px;display:flex;align-items:center;justify-content:center;color:#6B7280;border-radius:10px;border:1px solid #1F2937;">Foto em breve</div>',
+            unsafe_allow_html=True,
+        )
+
+    # Preço
+    st.markdown(
+        f'<div class="detalhe-preco">{imovel["valor"]}</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Características
+    partes = []
+    if imovel["area_util"]:
+        partes.append(f"{imovel['area_util']} úteis")
+    if imovel["quartos"]:
+        partes.append(f"{imovel['quartos']} dormitórios")
+    if imovel["vagas"]:
+        partes.append(f"{imovel['vagas']} vaga(s)")
+    if partes:
+        st.markdown(
+            f'<div class="detalhe-specs">{" · ".join(partes)}</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown('<hr class="thin-divider">', unsafe_allow_html=True)
+
+    # CTA de conversão
+    st.markdown(
+        '<div class="detalhe-secao">Interessou?</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div style="color:#6B7280;font-size:0.88rem;margin-bottom:0.9rem;">Fale com um de nossos consultores e tire todas as suas dúvidas.</div>',
+        unsafe_allow_html=True,
+    )
+
+    msg_whats = (
+        f"Olá, tenho interesse no imóvel {imovel['codigo']} "
+        f"({imovel['tipo']} em {imovel['bairro']}). "
+        f"Gostaria de mais informações."
+    )
+    link_wf = f"https://wa.me/{TELEFONE_FERNANDO}?text={urllib.parse.quote(msg_whats)}"
+    link_wv = f"https://wa.me/{TELEFONE_VALDIR}?text={urllib.parse.quote(msg_whats)}"
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.link_button("Fernando Carvalho", link_wf, use_container_width=True)
+    with c2:
+        st.link_button("Valdir Ferreira", link_wv, use_container_width=True)
+
+    # Rodapé da página de detalhe
+    st.markdown(
+        """
+        <div class="footer-cf">
+            <div class="footer-line"></div>
+            <div class="footer-text">Carvalho Ferreira · Consultoria Imobiliária</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.stop()  # não renderiza a listagem
+
+# =============================================================================
+# FILTRAGEM (listagem / carrossel)
 # =============================================================================
 
 cat_ativa = st.session_state["cat"]
@@ -631,6 +799,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
 
 # =============================================================================
 # RENDER
@@ -688,13 +857,12 @@ def render_card(imovel, key_suffix=""):
         partes.append(f"{imovel['area_util']} úteis")
     st.markdown(f'<div class="tipo-detalhe">{" · ".join(partes)}</div>', unsafe_allow_html=True)
 
-    # Botão único (preparado para futura página do imóvel)
     if st.button("Ver imóvel", key=f"ver_{imovel['codigo']}_{key_suffix}", use_container_width=True):
         st.session_state["imovel_selecionado"] = imovel["codigo"]
-        # Por enquanto só mostra mensagem — na FASE 4 vira página completa
-        st.toast(f"Imóvel {imovel['codigo']} selecionado. Página individual em breve.")
+        st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 if not imoveis_exibidos:
@@ -741,9 +909,10 @@ else:
 
             if st.button("Ver imóvel", key=f"destaque_ver_{imovel['codigo']}", use_container_width=True):
                 st.session_state["imovel_selecionado"] = imovel["codigo"]
-                st.toast(f"Imóvel {imovel['codigo']} selecionado. Página individual em breve.")
+                st.rerun()
 
             st.markdown("</div>", unsafe_allow_html=True)
+
 
         # Navegação do carrossel
         c1, c2, c3 = st.columns([1, 2, 1])
