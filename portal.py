@@ -581,13 +581,19 @@ def obter_foto_miniatura_por_id(file_id):
         return None
 
 
-@st.cache_data(ttl=600)
+def _eh_arquivo_imagem(nome, mime=""):
+    mime = (mime or "").lower()
+    if "image/" in mime:
+        return True
+    nome = (nome or "").lower()
+    return any(nome.endswith(ext) for ext in (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"))
+
+
+@st.cache_data(ttl=300)
 def listar_fotos_pasta_miniatura(file_id, limite=MAX_FOTOS_DETALHE):
     """
     Usa APENAS imagens da pasta de miniaturas.
-    - Se o ID for um arquivo dentro de pasta cujo nome contém MINIATURA → lista as imagens dessa pasta
-    - Se o ID for a própria pasta MINIATURA → lista as imagens dentro dela
-    - Caso contrário → retorna só a miniatura cadastrada (não puxa fotos de outras pastas)
+    Aceita mime image/* e também por extensão (.jpg, .png...).
     """
     if not file_id or len(str(file_id).strip()) < 10:
         return []
@@ -596,53 +602,57 @@ def listar_fotos_pasta_miniatura(file_id, limite=MAX_FOTOS_DETALHE):
         meta = drive.files().get(
             fileId=file_id.strip(),
             fields="id, name, parents, mimeType",
+            supportsAllDrives=True,
         ).execute()
 
         mime = meta.get("mimeType", "")
         folder_id = None
 
-        # Caso 1: o ID já é uma pasta
         if "folder" in mime:
             nome_pasta = normalizar(meta.get("name", ""))
             if "MINIATURA" in nome_pasta:
                 folder_id = file_id.strip()
         else:
-            # Caso 2: arquivo — verifica se a pasta pai é de miniaturas
             parents = meta.get("parents") or []
             if parents:
                 parent = drive.files().get(
                     fileId=parents[0],
                     fields="id, name",
+                    supportsAllDrives=True,
                 ).execute()
                 nome_pasta = normalizar(parent.get("name", ""))
                 if "MINIATURA" in nome_pasta:
                     folder_id = parents[0]
 
-        # Se não estiver na pasta miniatura, usa só o arquivo cadastrado
         if not folder_id:
             data = obter_foto_miniatura_por_id(file_id)
             return [data] if data else []
 
         result = drive.files().list(
-            q=(
-                f"'{folder_id}' in parents and trashed = false and "
-                f"mimeType contains 'image/'"
-            ),
-            fields="files(id, name)",
+            q=f"'{folder_id}' in parents and trashed = false",
+            fields="files(id, name, mimeType)",
             orderBy="name",
-            pageSize=limite,
+            pageSize=50,
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True,
         ).execute()
 
-        files = result.get("files", [])[:limite]
+        files = [
+            f for f in result.get("files", [])
+            if _eh_arquivo_imagem(f.get("name"), f.get("mimeType"))
+        ][:limite]
+
         fotos = []
         for f in files:
             data = obter_foto_miniatura_por_id(f["id"])
             if data:
                 fotos.append(data)
-        return fotos if fotos else (
-            [obter_foto_miniatura_por_id(file_id)]
-            if obter_foto_miniatura_por_id(file_id) else []
-        )
+
+        if fotos:
+            return fotos
+
+        data = obter_foto_miniatura_por_id(file_id)
+        return [data] if data else []
     except Exception:
         data = obter_foto_miniatura_por_id(file_id)
         return [data] if data else []
@@ -660,6 +670,8 @@ if "idx_destaque" not in st.session_state:
     st.session_state["idx_destaque"] = 0
 if "imovel_selecionado" not in st.session_state:
     st.session_state["imovel_selecionado"] = None
+if "idx_foto" not in st.session_state:
+    st.session_state["idx_foto"] = 0
 
 # =============================================================================
 # LOGO
@@ -725,6 +737,7 @@ for i, cat_nome in enumerate(categorias):
             st.session_state["idx_destaque"] = 0
             st.session_state["busca_portal"] = ""
             st.session_state["imovel_selecionado"] = None
+            st.session_state["idx_foto"] = 0
             st.rerun()
 
 st.markdown('<hr class="thin-divider">', unsafe_allow_html=True)
@@ -814,30 +827,46 @@ if codigo_sel:
             unsafe_allow_html=True,
         )
 
-    # Fotos — somente da pasta MINIATURA
+    # Fotos — carrossel (somente pasta MINIATURA)
     with st.spinner("Carregando fotos..."):
         fotos = listar_fotos_pasta_miniatura(imovel["miniatura_id"], limite=MAX_FOTOS_DETALHE)
 
     if fotos:
-        # Principal
-        encoded0 = base64.b64encode(fotos[0]).decode("utf-8")
+        idx_f = st.session_state.get("idx_foto", 0)
+        if idx_f >= len(fotos):
+            idx_f = 0
+            st.session_state["idx_foto"] = 0
+
+        encoded = base64.b64encode(fotos[idx_f]).decode("utf-8")
         st.markdown(
-            f'<img class="detalhe-foto" src="data:image/jpeg;base64,{encoded0}" />',
+            f'<img class="detalhe-foto" src="data:image/jpeg;base64,{encoded}" />',
             unsafe_allow_html=True,
         )
-        # Demais em grade de 2 colunas (melhor proporção no PC e no celular)
+
         if len(fotos) > 1:
-            resto = fotos[1:]
-            for i in range(0, len(resto), 2):
-                grupo = resto[i : i + 2]
-                cols = st.columns(2, gap="small")
-                for j, foto in enumerate(grupo):
-                    with cols[j]:
-                        enc = base64.b64encode(foto).decode("utf-8")
-                        st.markdown(
-                            f'<div class="galeria-item"><img src="data:image/jpeg;base64,{enc}" /></div>',
-                            unsafe_allow_html=True,
-                        )
+            c1, c2, c3 = st.columns([1, 2, 1])
+            with c1:
+                if st.button("←", use_container_width=True, key="foto_prev"):
+                    st.session_state["idx_foto"] = (idx_f - 1) % len(fotos)
+                    st.rerun()
+            with c2:
+                st.markdown(
+                    f'<div style="text-align:center;color:#6B7280;font-size:0.85rem;padding-top:0.45rem;">'
+                    f"{idx_f + 1} / {len(fotos)}</div>",
+                    unsafe_allow_html=True,
+                )
+            with c3:
+                if st.button("→", use_container_width=True, key="foto_next"):
+                    st.session_state["idx_foto"] = (idx_f + 1) % len(fotos)
+                    st.rerun()
+
+            indicadores = "  ".join(
+                ["●" if i == idx_f else "○" for i in range(len(fotos))]
+            )
+            st.markdown(
+                f'<div style="text-align:center;color:#6B7280;font-size:0.85rem;margin-top:0.2rem;margin-bottom:0.6rem;">{indicadores}</div>',
+                unsafe_allow_html=True,
+            )
     else:
         st.markdown(
             '<div style="background:#111827;height:280px;display:flex;align-items:center;justify-content:center;color:#6B7280;border-radius:10px;border:1px solid #1F2937;">Foto em breve</div>',
@@ -1066,9 +1095,11 @@ def render_card(imovel, key_suffix=""):
 
     if st.button("Ver imóvel", key=f"ver_{imovel['codigo']}_{key_suffix}", use_container_width=True):
         st.session_state["imovel_selecionado"] = imovel["codigo"]
+        st.session_state["idx_foto"] = 0
         st.rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
+
 
 
 if not imoveis_exibidos:
@@ -1117,6 +1148,7 @@ else:
 
             if st.button("Ver imóvel", key=f"destaque_ver_{imovel['codigo']}", use_container_width=True):
                 st.session_state["imovel_selecionado"] = imovel["codigo"]
+                st.session_state["idx_foto"] = 0
                 st.rerun()
 
             st.markdown("</div>", unsafe_allow_html=True)
