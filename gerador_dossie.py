@@ -15,8 +15,8 @@ ORDEM FINAL:
 
 CORREÇÕES APLICADAS (2026-09):
 - Texto da barra lateral da capa e da página de encerramento não corta mais.
-- Todas as páginas de documentos (PDF e imagem) usam o mesmo estilo:
-  fundo off-white + cabeçalho padronizado + documento centralizado.
+- Páginas de documentos (PDF e imagem): fundo BRANCO + cabeçalho padronizado.
+- Capas institucionais mantêm o visual off-white + barra navy.
 - Lógica de subpasta do comprador mantida (só inclui se a pasta existir).
 """
 
@@ -1190,7 +1190,7 @@ html, body {
 }
 
 body {
-    background: {{ cor_fundo }};
+    background: #ffffff;
 }
 
 .pagina {
@@ -1198,7 +1198,7 @@ body {
     height: 297mm;
     box-sizing: border-box;
     position: relative;
-    background: {{ cor_fundo }};
+    background: #ffffff;
     page-break-after: always;
 }
 
@@ -1628,22 +1628,21 @@ h1 {
 
 # =========================================================
 # PROCESSAMENTO E NORMALIZAÇÃO DE PDFS A4
-# (agora com fundo off-white + cabeçalho)
+# (fundo BRANCO + cabeçalho)
 # =========================================================
 
 def _criar_pagina_com_fundo_e_cabecalho(codigo_imovel):
     """
-    Cria uma página A4 em branco com fundo off-white e
-    o cabeçalho padronizado, usando reportlab.
+    Cria uma página A4 em branco puro com o cabeçalho
+    padronizado, usando reportlab.
     Retorna os bytes do PDF de 1 página.
     """
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     largura, altura = A4
 
-    # Fundo off-white
-    cor_fundo = HexColor(COR_FUNDO)
-    c.setFillColor(cor_fundo)
+    # Fundo branco puro
+    c.setFillColor(HexColor("#ffffff"))
     c.rect(0, 0, largura, altura, fill=1, stroke=0)
 
     # Cabeçalho
@@ -1660,7 +1659,7 @@ def _criar_pagina_com_fundo_e_cabecalho(codigo_imovel):
 def normalizar_pdf_para_a4(conteudo_pdf, codigo_imovel):
     """
     Recebe os bytes de um PDF e força todas as páginas
-    para A4 vertical, com fundo off-white + cabeçalho
+    para A4 vertical, com fundo BRANCO + cabeçalho
     padronizado (mesmo estilo das páginas de imagem).
     """
 
