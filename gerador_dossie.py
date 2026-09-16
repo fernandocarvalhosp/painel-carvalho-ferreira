@@ -12,6 +12,12 @@ ORDEM FINAL:
 2. Documentos encontrados diretamente na pasta DOCUMENTOS / DOCUMENTAÇÃO
 3. Se existir: separador + documentos da subpasta DOCUMENTOS DO COMPRADOR
 4. Página de encerramento com contatos + LGPD
+
+CORREÇÕES APLICADAS (2026-09):
+- Texto da barra lateral da capa e da página de encerramento não corta mais.
+- Todas as páginas de documentos (PDF e imagem) usam o mesmo estilo:
+  fundo off-white + cabeçalho padronizado + documento centralizado.
+- Lógica de subpasta do comprador mantida (só inclui se a pasta existir).
 """
 
 import base64
@@ -24,6 +30,8 @@ import streamlit as st
 from PIL import Image, ImageOps
 from pypdf import PdfReader, PdfWriter, PageObject, Transformation
 from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.colors import Color, HexColor
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -948,7 +956,7 @@ def fonte_local(
 
 
 # =========================================================
-# HTML — CAPA
+# HTML — CAPA (texto lateral corrigido)
 # =========================================================
 
 HTML_CAPA = """
@@ -1049,22 +1057,25 @@ h1 {
     max-width: 105mm;
 }
 
+/* === CORREÇÃO: texto lateral cabe inteiro dentro da barra navy === */
 .rodape_esquerdo {
     position: absolute;
-    left: 18mm;
-    bottom: 34mm;
+    left: 7mm;
+    bottom: 28mm;
     color: {{ cor_claro }};
     font-family: Manrope, sans-serif;
-    font-size: 6pt;
-    letter-spacing: 2px;
-    width: 55mm;
+    font-size: 5.8pt;
+    letter-spacing: 1.2px;
+    line-height: 1.55;
+    width: 44mm;
+    text-align: left;
 }
 
 .rodape_esquerdo_linha {
-    width: 55mm;
+    width: 28mm;
     height: 0.3mm;
-    background: rgba(255,255,255,0.25);
-    margin-bottom: 6mm;
+    background: rgba(255,255,255,0.28);
+    margin-bottom: 5mm;
 }
 
 .rodape_direito {
@@ -1155,7 +1166,7 @@ h1 {
 
 
 # =========================================================
-# HTML — DOCUMENTO EM IMAGEM
+# HTML — DOCUMENTO EM IMAGEM (estilo padronizado)
 # =========================================================
 
 HTML_IMAGEM = """
@@ -1193,29 +1204,29 @@ body {
 
 .cabecalho {
     position: absolute;
-    top: 12mm;
-    left: 18mm;
-    right: 18mm;
+    top: 11mm;
+    left: 16mm;
+    right: 16mm;
     font-family: Manrope, sans-serif;
     font-size: 6pt;
-    letter-spacing: 2px;
+    letter-spacing: 1.8px;
     color: {{ cor_slate }};
 }
 
 .imagem {
     position: absolute;
-    left: 18mm;
-    right: 18mm;
-    top: 27mm;
-    bottom: 22mm;
+    left: 16mm;
+    right: 16mm;
+    top: 24mm;
+    bottom: 18mm;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 
 .imagem img {
-    max-width: 174mm;
-    max-height: 248mm;
+    max-width: 178mm;
+    max-height: 255mm;
     width: auto;
     height: auto;
     object-fit: contain;
@@ -1384,7 +1395,7 @@ h1 {
 
 
 # =========================================================
-# HTML — ENCERRAMENTO
+# HTML — ENCERRAMENTO (texto lateral corrigido)
 # =========================================================
 
 HTML_ENCERRAMENTO = """
@@ -1503,21 +1514,24 @@ h1 {
     position: absolute;
     left: 75mm;
     right: 25mm;
-    bottom: 35mm;
+    bottom: 32mm;
     font-family: Manrope, sans-serif;
     font-size: 6.5pt;
     line-height: 1.6;
     color: #777;
 }
 
+/* === CORREÇÃO: marca lateral cabe inteira === */
 .marca {
     position: absolute;
-    left: 18mm;
-    bottom: 35mm;
+    left: 7mm;
+    bottom: 28mm;
     font-family: Manrope, sans-serif;
-    font-size: 6pt;
-    letter-spacing: 2px;
+    font-size: 5.5pt;
+    letter-spacing: 1.3px;
+    line-height: 1.45;
     color: {{ cor_claro }};
+    width: 44mm;
 }
 
 </style>
@@ -1601,7 +1615,8 @@ h1 {
     </div>
 
     <div class="marca">
-        CARVALHO FERREIRA · CONSULTORIA IMOBILIÁRIA
+        CARVALHO FERREIRA<br>
+        CONSULTORIA IMOBILIÁRIA
     </div>
 
 </div>
@@ -1613,139 +1628,107 @@ h1 {
 
 # =========================================================
 # PROCESSAMENTO E NORMALIZAÇÃO DE PDFS A4
+# (agora com fundo off-white + cabeçalho)
 # =========================================================
 
-def normalizar_pdf_para_a4(conteudo_pdf):
+def _criar_pagina_com_fundo_e_cabecalho(codigo_imovel):
+    """
+    Cria uma página A4 em branco com fundo off-white e
+    o cabeçalho padronizado, usando reportlab.
+    Retorna os bytes do PDF de 1 página.
+    """
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    largura, altura = A4
+
+    # Fundo off-white
+    cor_fundo = HexColor(COR_FUNDO)
+    c.setFillColor(cor_fundo)
+    c.rect(0, 0, largura, altura, fill=1, stroke=0)
+
+    # Cabeçalho
+    c.setFillColor(HexColor(COR_SLATE))
+    c.setFont("Helvetica", 7)
+    texto_cabecalho = f"CARVALHO FERREIRA · DOSSIÊ DOCUMENTAL    {str(codigo_imovel).upper()}"
+    c.drawString(45, altura - 32, texto_cabecalho)
+
+    c.save()
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def normalizar_pdf_para_a4(conteudo_pdf, codigo_imovel):
     """
     Recebe os bytes de um PDF e força todas as páginas
-    para A4 vertical.
+    para A4 vertical, com fundo off-white + cabeçalho
+    padronizado (mesmo estilo das páginas de imagem).
     """
 
-    reader = PdfReader(
-        io.BytesIO(conteudo_pdf)
-    )
-
+    reader = PdfReader(io.BytesIO(conteudo_pdf))
     writer = PdfWriter()
 
     largura_a4 = float(A4[0])
     altura_a4 = float(A4[1])
 
+    # Página modelo com fundo + cabeçalho
+    pagina_modelo_bytes = _criar_pagina_com_fundo_e_cabecalho(codigo_imovel)
+    modelo_reader = PdfReader(io.BytesIO(pagina_modelo_bytes))
+    pagina_modelo = modelo_reader.pages[0]
+
     for pagina in reader.pages:
 
-        largura_orig = float(
-            pagina.mediabox.width
-        )
+        largura_orig = float(pagina.mediabox.width)
+        altura_orig = float(pagina.mediabox.height)
 
-        altura_orig = float(
-            pagina.mediabox.height
-        )
-
-        rotacao = pagina.get(
-            "/Rotate",
-            0,
-        )
+        rotacao = pagina.get("/Rotate", 0)
 
         if rotacao in [90, 270]:
-            largura_orig, altura_orig = (
-                altura_orig,
-                largura_orig,
-            )
+            largura_orig, altura_orig = altura_orig, largura_orig
 
-        margem = 20.0
+        # Margens um pouco maiores para ficar elegante com o cabeçalho
+        margem_x = 28.0
+        margem_topo = 48.0   # espaço para o cabeçalho
+        margem_baixo = 28.0
 
-        largura_util = (
-            largura_a4
-            - (2 * margem)
+        largura_util = largura_a4 - (2 * margem_x)
+        altura_util = altura_a4 - margem_topo - margem_baixo
+
+        escala_x = largura_util / largura_orig if largura_orig > 0 else 1.0
+        escala_y = altura_util / altura_orig if altura_orig > 0 else 1.0
+        escala = min(escala_x, escala_y)
+
+        largura_redim = largura_orig * escala
+        altura_redim = altura_orig * escala
+
+        offset_x = (largura_a4 - largura_redim) / 2.0
+        offset_y = margem_baixo + (altura_util - altura_redim) / 2.0
+
+        # Nova página = cópia do modelo (fundo + cabeçalho)
+        nova_pagina = PageObject.create_blank_page(
+            width=largura_a4,
+            height=altura_a4,
         )
+        nova_pagina.merge_page(pagina_modelo)
 
-        altura_util = (
-            altura_a4
-            - (2 * margem)
-        )
-
-        escala_x = (
-            largura_util / largura_orig
-            if largura_orig > 0
-            else 1.0
-        )
-
-        escala_y = (
-            altura_util / altura_orig
-            if altura_orig > 0
-            else 1.0
-        )
-
-        escala = min(
-            escala_x,
-            escala_y,
-        )
-
-        largura_redim = (
-            largura_orig * escala
-        )
-
-        altura_redim = (
-            altura_orig * escala
-        )
-
-        offset_x = (
-            largura_a4
-            - largura_redim
-        ) / 2.0
-
-        offset_y = (
-            altura_a4
-            - altura_redim
-        ) / 2.0
-
-        nova_pagina = (
-            PageObject.create_blank_page(
-                width=largura_a4,
-                height=altura_a4,
-            )
-        )
-
+        # Conteúdo original escalado e centralizado
         transformacao = (
             Transformation()
-            .scale(
-                escala,
-                escala,
-            )
-            .translate(
-                offset_x,
-                offset_y,
-            )
+            .scale(escala, escala)
+            .translate(offset_x, offset_y)
         )
 
-        pagina_copia = (
-            PageObject.create_blank_page(
-                width=largura_orig,
-                height=altura_orig,
-            )
+        pagina_copia = PageObject.create_blank_page(
+            width=largura_orig,
+            height=altura_orig,
         )
+        pagina_copia.merge_page(pagina)
+        pagina_copia.add_transformation(transformacao)
 
-        pagina_copia.merge_page(
-            pagina
-        )
-
-        pagina_copia.add_transformation(
-            transformacao
-        )
-
-        nova_pagina.merge_page(
-            pagina_copia
-        )
-
-        writer.add_page(
-            nova_pagina
-        )
+        nova_pagina.merge_page(pagina_copia)
+        writer.add_page(nova_pagina)
 
     saida = io.BytesIO()
-
-    writer.write(
-        saida
-    )
-
+    writer.write(saida)
     return saida.getvalue()
 
 
@@ -2149,7 +2132,8 @@ def processar_documento(
 
         pdf_normalizado = (
             normalizar_pdf_para_a4(
-                conteudo
+                conteudo,
+                codigo_imovel,
             )
         )
 
