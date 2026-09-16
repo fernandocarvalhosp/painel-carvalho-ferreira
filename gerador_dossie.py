@@ -7,8 +7,9 @@ com padronização estrita de tamanho de página A4 Vertical (Portrait).
 
 ORDEM FINAL:
 1. Capa institucional
-2. Documentos encontrados na pasta DOCUMENTOS / DOCUMENTAÇÃO (Normalizados para A4)
-3. Página de encerramento com contatos + LGPD
+2. Página com o caminho da pasta / subpasta do imóvel
+3. Documentos encontrados na subpasta 'documentos do comprador' (Normalizados para A4)
+4. Página de encerramento com contatos + LGPD
 """
 
 import base64
@@ -220,7 +221,7 @@ def get_dado(dados, *chaves):
 # DRIVE
 # =========================================================
 
-def buscar_id_por_nome(service, nome_item, id_pasta_pai):
+def buscar_id_e_nome_por_nome(service, nome_item, id_pasta_pai):
     nome_normalizado = normalizar(nome_item)
     page_token = None
 
@@ -241,26 +242,31 @@ def buscar_id_por_nome(service, nome_item, id_pasta_pai):
 
         for arquivo in arquivos:
             if normalizar(arquivo.get("name")) == nome_normalizado:
-                return arquivo["id"]
+                return arquivo["id"], arquivo["name"]
 
         for arquivo in arquivos:
             nome_f = normalizar(arquivo.get("name"))
             if nome_normalizado in nome_f or nome_f in nome_normalizado:
-                return arquivo["id"]
+                return arquivo["id"], arquivo["name"]
 
         page_token = resposta.get("nextPageToken")
 
         if not page_token:
             break
 
-    return None
+    return None, None
 
 
-def buscar_pasta_imovel(service, codigo_imovel, id_pasta_imoveis):
+def buscar_id_por_nome(service, nome_item, id_pasta_pai):
+    id_item, _ = buscar_id_e_nome_por_nome(service, nome_item, id_pasta_pai)
+    return id_item
+
+
+def buscar_pasta_imovel_com_nome(service, codigo_imovel, id_pasta_imoveis):
     cod_chave = extrair_codigo_chave(codigo_imovel)
 
     if not cod_chave:
-        return None
+        return None, None
 
     page_token = None
     todas_pastas = []
@@ -290,46 +296,87 @@ def buscar_pasta_imovel(service, codigo_imovel, id_pasta_imoveis):
 
     for pasta in todas_pastas:
         if extrair_codigo_chave(pasta.get("name")) == cod_chave:
-            return pasta["id"]
+            return pasta["id"], pasta["name"]
 
     for pasta in todas_pastas:
         nome_limpo = extrair_codigo_chave(pasta.get("name"))
         if nome_limpo.startswith(cod_chave) or cod_chave in nome_limpo:
-            return pasta["id"]
+            return pasta["id"], pasta["name"]
 
-    return None
+    return None, None
 
 
-def localizar_pasta_documentacao(service, codigo_imovel):
-    id_portfolio = buscar_id_por_nome(service, "PORTFOLIO", ID_RAIZ)
+def buscar_pasta_imovel(service, codigo_imovel, id_pasta_imoveis):
+    id_p, _ = buscar_pasta_imovel_com_nome(service, codigo_imovel, id_pasta_imoveis)
+    return id_p
+
+
+def localizar_pasta_documentacao_com_caminho(service, codigo_imovel):
+    """
+    Navega na estrutura:
+    PORTFOLIO -> IMOVEIS -> [PASTA IMOVEL] -> documentos -> documentos do comprador
+    """
+    id_portfolio, nome_portfolio = buscar_id_e_nome_por_nome(service, "PORTFOLIO", ID_RAIZ)
 
     if not id_portfolio:
         raise FileNotFoundError("Pasta PORTFOLIO não encontrada no Drive.")
 
-    id_imoveis = buscar_id_por_nome(service, "IMOVEIS", id_portfolio)
+    id_imoveis, nome_imoveis = buscar_id_e_nome_por_nome(service, "IMOVEIS", id_portfolio)
 
     if not id_imoveis:
         raise FileNotFoundError("Pasta IMOVEIS não encontrada dentro de PORTFOLIO.")
 
-    id_imovel = buscar_pasta_imovel(service, codigo_imovel, id_imoveis)
+    id_imovel, nome_imovel = buscar_pasta_imovel_com_nome(service, codigo_imovel, id_imoveis)
 
     if not id_imovel:
         raise FileNotFoundError(f"Pasta do imóvel {codigo_imovel} não encontrada.")
 
-    id_documentos = buscar_id_por_nome(service, "documentos", id_imovel)
+    # 1. Busca a pasta pai de documentos
+    id_documentos, nome_docs = buscar_id_e_nome_por_nome(service, "documentos", id_imovel)
 
     if not id_documentos:
-        id_documentos = buscar_id_por_nome(service, "documentacao", id_imovel)
+        id_documentos, nome_docs = buscar_id_e_nome_por_nome(service, "documentacao", id_imovel)
 
     if not id_documentos:
-        id_documentos = buscar_id_por_nome(service, "docs", id_imovel)
+        id_documentos, nome_docs = buscar_id_e_nome_por_nome(service, "docs", id_imovel)
 
     if not id_documentos:
         raise FileNotFoundError(
             f"A pasta 'documentos' não foi encontrada dentro do imóvel {codigo_imovel}."
         )
 
-    return id_documentos
+    # 2. Busca a subpasta específica 'documentos do comprador'
+    termos_comprador = [
+        "documentos do comprador",
+        "documento do comprador",
+        "documentacao do comprador",
+        "docs do comprador",
+        "docs comprador",
+        "comprador",
+    ]
+
+    id_comprador = None
+    nome_comprador = None
+
+    for termo in termos_comprador:
+        id_comprador, nome_comprador = buscar_id_e_nome_por_nome(service, termo, id_documentos)
+        if id_comprador:
+            break
+
+    # Se encontrar a subpasta do comprador, navega até ela; caso contrário, usa a pasta de documentos principal
+    if id_comprador:
+        id_final = id_comprador
+        caminho = f"{nome_portfolio} / {nome_imoveis} / {nome_imovel} / {nome_docs} / {nome_comprador}"
+    else:
+        id_final = id_documentos
+        caminho = f"{nome_portfolio} / {nome_imoveis} / {nome_imovel} / {nome_docs}"
+
+    return id_final, caminho
+
+
+def localizar_pasta_documentacao(service, codigo_imovel):
+    id_docs, _ = localizar_pasta_documentacao_com_caminho(service, codigo_imovel)
+    return id_docs
 
 
 # =========================================================
@@ -452,7 +499,7 @@ def fonte_local(subpasta, nome_arquivo):
 
 
 # =========================================================
-# HTML TEMPLATES (CAPA, IMAGEM, ENCERRAMENTO)
+# HTML TEMPLATES (CAPA, CAMINHO, IMAGEM, ENCERRAMENTO)
 # =========================================================
 
 HTML_CAPA = """
@@ -521,6 +568,60 @@ body { background: {{ cor_fundo }}; color: {{ cor_navy }}; font-family: "Manrope
         <div class="bloco-label">MATERIAL DOCUMENTAL</div>
         <div class="bloco-texto">
             Os documentos apresentados neste dossiê correspondem aos arquivos disponibilizados para esta operação imobiliária.
+        </div>
+    </div>
+    <div class="rodape">
+        <div>CARVALHO FERREIRA</div>
+        <div class="rodape-direita">{{ codigo }}</div>
+    </div>
+</div>
+</body>
+</html>
+"""
+
+HTML_CAMINHO_PASTA = """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<style>
+@page { size: A4; margin: 0; }
+@font-face { font-family: "Cormorant"; src: url("{{ fonte_cormorant }}"); font-weight: 500; }
+@font-face { font-family: "Cormorant"; src: url("{{ fonte_cormorant_semibold }}"); font-weight: 600; }
+@font-face { font-family: "Manrope"; src: url("{{ fonte_manrope }}"); font-weight: 400; }
+@font-face { font-family: "Manrope"; src: url("{{ fonte_manrope_medium }}"); font-weight: 500; }
+@font-face { font-family: "Manrope"; src: url("{{ fonte_manrope_semibold }}"); font-weight: 600; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; width: 210mm; height: 297mm; }
+body { background: {{ cor_fundo }}; color: {{ cor_navy }}; font-family: "Manrope", sans-serif; }
+.pagina { width: 210mm; height: 297mm; position: relative; overflow: hidden; background: {{ cor_fundo }}; }
+.faixa { position: absolute; top: 0; left: 0; width: 58mm; height: 297mm; background: {{ cor_navy }}; }
+.conteudo { position: absolute; left: 58mm; top: 0; width: 152mm; height: 297mm; padding: 24mm 22mm 20mm 18mm; }
+.superior { font-size: 9px; letter-spacing: 2.8px; color: {{ cor_dourado }}; font-weight: 600; margin-bottom: 5mm; }
+.titulo { font-family: "Cormorant", serif; font-size: 32px; line-height: 1.0; font-weight: 600; text-transform: uppercase; margin: 0; color: {{ cor_navy }}; }
+.linha { width: 24mm; height: 0.5mm; background: {{ cor_dourado }}; margin: 9mm 0 12mm 0; }
+.caixa-caminho { background: #ffffff; border: 1px solid {{ cor_linha }}; border-radius: 6px; padding: 18px 20px; margin-top: 10mm; width: 115mm; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+.label-caminho { font-size: 8px; letter-spacing: 2px; color: {{ cor_dourado }}; font-weight: 600; margin-bottom: 8px; text-transform: uppercase; }
+.texto-caminho { font-size: 11px; line-height: 1.6; color: {{ cor_navy }}; font-weight: 500; word-break: break-word; }
+.texto-explicativo { margin-top: 12mm; max-width: 115mm; font-size: 10px; line-height: 1.7; color: #475569; }
+.rodape { position: absolute; bottom: 12mm; left: 18mm; right: 22mm; display: flex; justify-content: space-between; align-items: center; font-size: 7px; letter-spacing: 1.5px; color: {{ cor_slate }}; }
+.rodape-direita { color: {{ cor_dourado }}; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="pagina">
+    <div class="faixa"></div>
+    <div class="conteudo">
+        <div class="superior">ORIGEM DOS DOCUMENTOS</div>
+        <h1 class="titulo">Localização<br>no Repositório</h1>
+        <div class="linha"></div>
+        <div class="caixa-caminho">
+            <div class="label-caminho">Caminho do Diretório / Pasta</div>
+            <div class="texto-caminho">{{ caminho_pasta }}</div>
+        </div>
+        <div class="texto-explicativo">
+            Os documentos compilados neste dossiê foram extraídos diretamente do repositório digital
+            no caminho indicado acima, garantindo a rastreabilidade e integridade das informações apresentadas.
         </div>
     </div>
     <div class="rodape">
@@ -747,6 +848,27 @@ def gerar_capa_pdf_bytes(codigo_imovel, dados_imovel=None):
     return html_para_pdf(html)
 
 
+def gerar_pagina_caminho_pdf_bytes(codigo_imovel, caminho_pasta):
+    contexto = {
+        "codigo": str(codigo_imovel).upper(),
+        "caminho_pasta": caminho_pasta,
+        "cor_fundo": COR_FUNDO,
+        "cor_navy": COR_NAVY,
+        "cor_claro": COR_CLARO,
+        "cor_slate": COR_SLATE,
+        "cor_dourado": COR_DOURADO,
+        "cor_linha": COR_LINHA,
+        "fonte_cormorant": fonte_local("Cormorant Garamond", "CormorantGaramond-Medium.ttf"),
+        "fonte_cormorant_semibold": fonte_local("Cormorant Garamond", "CormorantGaramond-SemiBold.ttf"),
+        "fonte_manrope": fonte_local("Manrope", "Manrope-Regular.ttf"),
+        "fonte_manrope_medium": fonte_local("Manrope", "Manrope-Medium.ttf"),
+        "fonte_manrope_semibold": fonte_local("Manrope", "Manrope-SemiBold.ttf"),
+    }
+
+    html = Template(HTML_CAMINHO_PASTA).render(**contexto)
+    return html_para_pdf(html)
+
+
 def preparar_imagem_para_pdf(conteudo_imagem):
     imagem = Image.open(io.BytesIO(conteudo_imagem))
     imagem = ImageOps.exif_transpose(imagem)
@@ -880,7 +1002,7 @@ def gerar_dossie(codigo_imovel, dados_imovel=None):
         if dados_imovel is None:
             dados_imovel = {}
 
-        id_documentos = localizar_pasta_documentacao(drive, codigo)
+        id_documentos, caminho_pasta = localizar_pasta_documentacao_com_caminho(drive, codigo)
         arquivos = listar_arquivos_documentacao(drive, id_documentos)
 
         if not arquivos:
@@ -894,7 +1016,7 @@ def gerar_dossie(codigo_imovel, dados_imovel=None):
                 "falhas": [],
                 "mensagem": (
                     f"Nenhum documento PDF ou imagem "
-                    f"foi encontrado na pasta 'documentos' do {codigo}."
+                    f"foi encontrado no caminho: {caminho_pasta}"
                 ),
             }
 
@@ -906,9 +1028,15 @@ def gerar_dossie(codigo_imovel, dados_imovel=None):
         nome_arquivo = " - ".join(partes) + ".pdf"
         pdfs = []
 
+        # 1. Capa Institucional
         capa = gerar_capa_pdf_bytes(codigo, dados_imovel)
         pdfs.append(capa)
 
+        # 2. Página com Caminho da Pasta / Subpasta
+        pagina_caminho = gerar_pagina_caminho_pdf_bytes(codigo, caminho_pasta)
+        pdfs.append(pagina_caminho)
+
+        # 3. Documentos do Imóvel / Comprador
         falhas = []
         documentos_processados = 0
         paginas_documentos = 0
@@ -937,6 +1065,7 @@ def gerar_dossie(codigo_imovel, dados_imovel=None):
                     "erro": str(erro),
                 })
 
+        # 4. Página de Encerramento
         encerramento = gerar_encerramento_pdf_bytes()
         pdfs.append(encerramento)
 
