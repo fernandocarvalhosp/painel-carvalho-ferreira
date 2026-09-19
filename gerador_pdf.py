@@ -1,18 +1,35 @@
 # -*- coding: utf-8 -*-
+
 """
 gerador_pdf.py
-Gera o dossie em memoria (bytes). Sem upload no Drive. Sem interface.
+
+Gera o dossiê/folha comercial do imóvel em memória (bytes).
+
+- Sem upload no Google Drive.
+- Sem interface.
+- Lê os dados diretamente da aba "Imoveis".
+- Compatível com a estrutura atual da planilha.
+- Lê todas as colunas existentes da planilha.
+- Usa as fotos da pasta FOTOS SELECIONADAS.
 """
+
 import base64
 import io
 import re
+import unicodedata
 from pathlib import Path
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
+
 from jinja2 import Template
 import weasyprint
+
+
+# =========================================================
+# CONFIGURAÇÃO
+# =========================================================
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -22,7 +39,11 @@ SCOPES = [
 ]
 
 ID_RAIZ = "1NaZ7kv_jHVCTlLV8vqxCzBwbTX5y3fR7"
-SPREADSHEET_ID = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
+
+SPREADSHEET_ID = (
+    "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
+)
+
 NOME_ABA = "Imoveis"
 
 PASTA_MARCA = SCRIPT_DIR / "marca"
@@ -31,24 +52,174 @@ PASTA_LOGO = PASTA_MARCA / "logo"
 PASTA_FONTES = PASTA_MARCA / "fontes"
 
 
+# =========================================================
+# GOOGLE
+# =========================================================
+
 def conectar_google():
-    """Autentica via st.secrets['google_credentials'].""" 
+    """
+    Autentica via st.secrets['google_credentials'].
+    """
+
     try:
         import streamlit as st
 
-        creds_dict = dict(st.secrets["google_credentials"])
-        creds = service_account.Credentials.from_service_account_info(
-            creds_dict, scopes=SCOPES
+        creds_dict = dict(
+            st.secrets["google_credentials"]
         )
-        drive = build("drive", "v3", credentials=creds)
-        sheets = build("sheets", "v4", credentials=creds)
+
+        creds = (
+            service_account
+            .Credentials
+            .from_service_account_info(
+                creds_dict,
+                scopes=SCOPES
+            )
+        )
+
+        drive = build(
+            "drive",
+            "v3",
+            credentials=creds
+        )
+
+        sheets = build(
+            "sheets",
+            "v4",
+            credentials=creds
+        )
+
         return drive, sheets
+
     except Exception as e:
-        print(f"Erro ao autenticar no Google: {e}", flush=True)
+
+        print(
+            f"Erro ao autenticar no Google: {e}",
+            flush=True
+        )
+
         return None, None
 
 
-def buscar_id_por_nome(service, nome_item, id_pasta_pai):
+# =========================================================
+# NORMALIZAÇÃO
+# =========================================================
+
+def normalizar(texto):
+    """
+    Normaliza texto para comparação de campos.
+
+    Remove:
+    - espaços extras
+    - acentos
+    - diferenças entre maiúsculas/minúsculas
+    """
+
+    if texto is None:
+        return ""
+
+    texto = str(texto).strip()
+
+    if not texto:
+        return ""
+
+    texto = unicodedata.normalize(
+        "NFD",
+        texto
+    )
+
+    texto = "".join(
+        caractere
+        for caractere in texto
+        if unicodedata.category(caractere) != "Mn"
+    )
+
+    texto = " ".join(
+        texto.upper().split()
+    )
+
+    return texto
+
+
+def valor_preenchido(valor):
+    """
+    Retorna True somente quando existe uma informação real.
+
+    Valores considerados vazios:
+    - vazio
+    - -
+    - —
+    - n/a
+    - não informado
+    """
+
+    if valor is None:
+        return False
+
+    texto = str(valor).strip()
+
+    if not texto:
+        return False
+
+    texto_normalizado = normalizar(texto).lower()
+
+    valores_vazios = {
+        "-",
+        "—",
+        "N/A".lower(),
+        "NA",
+        "NAO INFORMADO",
+        "NÃO INFORMADO",
+        "NAO INFORMADO.",
+        "NÃO INFORMADO.",
+    }
+
+    return texto_normalizado not in valores_vazios
+
+
+def valor_positivo(valor):
+    """
+    Para características numéricas.
+
+    Zero não aparece em:
+    - dormitórios
+    - suítes
+    - banheiros
+    - vagas
+
+    Se o valor não for puramente numérico,
+    mantém a informação.
+    """
+
+    if not valor_preenchido(valor):
+        return False
+
+    texto = str(valor).strip()
+
+    texto = texto.replace(",", ".")
+
+    try:
+
+        return float(texto) > 0
+
+    except ValueError:
+
+        return True
+
+
+# =========================================================
+# DRIVE
+# =========================================================
+
+def buscar_id_por_nome(
+    service,
+    nome_item,
+    id_pasta_pai
+):
+    """
+    Procura uma pasta/arquivo pelo nome exato.
+    """
+
     if not service or not id_pasta_pai:
         return None
 
@@ -59,68 +230,150 @@ def buscar_id_por_nome(service, nome_item, id_pasta_pai):
     )
 
     try:
-        results = service.files().list(
-            q=query,
-            fields="files(id, name)",
-            supportsAllDrives=True,
-            includeItemsFromAllDrives=True,
-        ).execute()
 
-        files = results.get("files", [])
-        return files[0]["id"] if files else None
+        results = (
+            service
+            .files()
+            .list(
+                q=query,
+                fields="files(id, name)",
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+            )
+            .execute()
+        )
+
+        files = results.get(
+            "files",
+            []
+        )
+
+        return (
+            files[0]["id"]
+            if files
+            else None
+        )
 
     except Exception as e:
-        print(f"Erro ao buscar '{nome_item}': {e}", flush=True)
+
+        print(
+            f"Erro ao buscar '{nome_item}': {e}",
+            flush=True
+        )
+
         return None
 
 
-def buscar_pasta_imovel_por_codigo(service, codigo_imovel, id_pasta_imoveis):
+def buscar_pasta_imovel_por_codigo(
+    service,
+    codigo_imovel,
+    id_pasta_imoveis
+):
+    """
+    Localiza a pasta do imóvel pelo código.
+
+    Aceita, por exemplo:
+    CF007
+    CF007 - Apartamento
+    CF007 - AP SPazio
+    """
+
     if not service or not id_pasta_imoveis:
         return None
 
-    codigo = codigo_imovel.strip().upper()
+    codigo = normalizar(
+        codigo_imovel
+    )
 
     query = (
         f"'{id_pasta_imoveis}' in parents "
-        f"and mimeType = 'application/vnd.google-apps.folder' "
-        f"and name contains '{codigo}' "
+        f"and mimeType = "
+        f"'application/vnd.google-apps.folder' "
         f"and trashed = false"
     )
 
     try:
-        results = service.files().list(
-            q=query,
-            fields="files(id, name)",
-            supportsAllDrives=True,
-            includeItemsFromAllDrives=True,
-        ).execute()
 
-        files = results.get("files", [])
+        results = (
+            service
+            .files()
+            .list(
+                q=query,
+                fields="files(id, name)",
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+                pageSize=1000,
+            )
+            .execute()
+        )
+
+        files = results.get(
+            "files",
+            []
+        )
 
         if not files:
             return None
 
-        for f in files:
-            nome = f["name"].strip().upper()
+        # Primeiro: igualdade exata
+        for arquivo in files:
+
+            nome = normalizar(
+                arquivo.get("name", "")
+            )
+
+            if nome == codigo:
+                return arquivo["id"]
+
+        # Segundo: começa pelo código
+        for arquivo in files:
+
+            nome = normalizar(
+                arquivo.get("name", "")
+            )
 
             if (
-                nome == codigo
-                or nome.startswith(codigo + " ")
+                nome.startswith(codigo + " ")
                 or nome.startswith(codigo + "-")
+                or nome.startswith(codigo + "_")
             ):
-                return f["id"]
+                return arquivo["id"]
 
-        return files[0]["id"]
+        # Terceiro: código contido
+        for arquivo in files:
+
+            nome = normalizar(
+                arquivo.get("name", "")
+            )
+
+            if codigo in nome:
+                return arquivo["id"]
+
+        return None
 
     except Exception as e:
+
         print(
-            f"Erro ao buscar pasta do imovel '{codigo_imovel}': {e}",
+            f"Erro ao buscar pasta do imóvel "
+            f"'{codigo_imovel}': {e}",
             flush=True
         )
+
         return None
 
 
-def obter_id_pasta_imovel(service, codigo_imovel):
+def obter_id_pasta_imovel(
+    service,
+    codigo_imovel
+):
+    """
+    Localiza:
+
+    PORTFOLIO
+        └── IMOVEIS
+            └── CFxxx
+    """
+
     id_portfolio = buscar_id_por_nome(
         service,
         "PORTFOLIO",
@@ -128,7 +381,12 @@ def obter_id_pasta_imovel(service, codigo_imovel):
     )
 
     if not id_portfolio:
-        print("Pasta PORTFOLIO nao encontrada.", flush=True)
+
+        print(
+            "Pasta PORTFOLIO não encontrada.",
+            flush=True
+        )
+
         return None
 
     id_imoveis = buscar_id_por_nome(
@@ -138,31 +396,56 @@ def obter_id_pasta_imovel(service, codigo_imovel):
     )
 
     if not id_imoveis:
-        print("Pasta IMOVEIS nao encontrada.", flush=True)
+
+        print(
+            "Pasta IMOVEIS não encontrada.",
+            flush=True
+        )
+
         return None
 
-    id_imovel = buscar_pasta_imovel_por_codigo(
-        service,
-        codigo_imovel,
-        id_imoveis
+    id_imovel = (
+        buscar_pasta_imovel_por_codigo(
+            service,
+            codigo_imovel,
+            id_imoveis
+        )
     )
 
     if not id_imovel:
+
         print(
-            f"Pasta do imovel '{codigo_imovel}' nao encontrada.",
+            f"Pasta do imóvel "
+            f"'{codigo_imovel}' não encontrada.",
             flush=True
         )
+
         return None
 
     return id_imovel
 
 
-def baixar_bytes(service, id_arquivo):
-    """Baixa arquivo do Drive direto para bytes (RAM)."""
+def baixar_bytes(
+    service,
+    id_arquivo
+):
+    """
+    Baixa arquivo do Drive diretamente
+    para memória.
+    """
+
     try:
-        request = service.files().get_media(fileId=id_arquivo)
+
+        request = (
+            service
+            .files()
+            .get_media(
+                fileId=id_arquivo
+            )
+        )
 
         memoria = io.BytesIO()
+
         downloader = MediaIoBaseDownload(
             memoria,
             request
@@ -171,43 +454,78 @@ def baixar_bytes(service, id_arquivo):
         done = False
 
         while not done:
-            _, done = downloader.next_chunk()
+
+            _, done = (
+                downloader.next_chunk()
+            )
 
         return memoria.getvalue()
 
     except Exception as e:
+
         print(
-            f"Erro ao baixar arquivo {id_arquivo}: {e}",
+            f"Erro ao baixar arquivo "
+            f"{id_arquivo}: {e}",
             flush=True
         )
+
         return None
 
 
-def bytes_para_data_uri(data, mime_type):
+# =========================================================
+# ASSETS
+# =========================================================
+
+def bytes_para_data_uri(
+    data,
+    mime_type
+):
     if not data:
         return ""
 
-    b64 = base64.b64encode(data).decode("ascii")
+    b64 = base64.b64encode(
+        data
+    ).decode("ascii")
 
-    return f"data:{mime_type};base64,{b64}"
+    return (
+        f"data:{mime_type};base64,{b64}"
+    )
 
 
-def carregar_icone_local(nome_arquivo, cor=None):
-    caminho = PASTA_ICONES / nome_arquivo
+def carregar_icone_local(
+    nome_arquivo,
+    cor=None
+):
+    caminho = (
+        PASTA_ICONES /
+        nome_arquivo
+    )
 
     if not caminho.exists():
         return ""
 
-    svg = caminho.read_text(encoding="utf-8")
+    try:
+
+        svg = caminho.read_text(
+            encoding="utf-8"
+        )
+
+    except Exception:
+        return ""
 
     if cor:
+
         for antigo in (
             "currentColor",
             "#000000",
             "#000",
             "black"
         ):
-            svg = svg.replace(antigo, cor)
+
+            svg = svg.replace(
+                antigo,
+                cor
+            )
 
     return svg
 
@@ -224,141 +542,239 @@ def buscar_logo_local():
         ".webp"
     }
 
+    arquivos = []
+
     for arquivo in PASTA_LOGO.iterdir():
+
         if (
             arquivo.is_file()
-            and arquivo.suffix.lower() in extensoes
+            and arquivo.suffix.lower()
+            in extensoes
         ):
-            return arquivo.as_uri()
 
-    return None
+            arquivos.append(
+                arquivo
+            )
+
+    if not arquivos:
+        return None
+
+    arquivo = sorted(
+        arquivos,
+        key=lambda p: p.name.lower()
+    )[0]
+
+    return arquivo.as_uri()
 
 
-def fonte_local(subpasta, nome_arquivo):
-    caminho = PASTA_FONTES / subpasta / nome_arquivo
+def fonte_local(
+    subpasta,
+    nome_arquivo
+):
+    caminho = (
+        PASTA_FONTES /
+        subpasta /
+        nome_arquivo
+    )
 
     if caminho.exists():
         return caminho.as_uri()
 
     if PASTA_FONTES.exists():
-        for encontrado in PASTA_FONTES.rglob(nome_arquivo):
+
+        for encontrado in PASTA_FONTES.rglob(
+            nome_arquivo
+        ):
+
             if encontrado.is_file():
                 return encontrado.as_uri()
 
     return ""
 
 
-def normalizar(texto):
-    if not texto:
-        return ""
+# =========================================================
+# GOOGLE SHEETS
+# =========================================================
 
-    return " ".join(
-        str(texto).strip().upper().split()
-    )
+def ler_dados_sheets(
+    sheets,
+    codigo_imovel
+):
+    """
+    Lê TODAS as colunas disponíveis na aba Imoveis.
 
+    Não fica limitado a A:Z ou A:AC.
 
-def ler_dados_sheets(sheets, codigo_imovel):
+    Isso permite que novas colunas adicionadas
+    à interface pública continuem disponíveis
+    para os geradores antigos.
+
+    O imóvel é localizado pelo cabeçalho CODIGO,
+    e não pela posição fixa da coluna.
+    """
+
     try:
-        result = sheets.spreadsheets().values().get(
-            spreadsheetId=SPREADSHEET_ID,
-            range=f"'{NOME_ABA}'!A:AC",
-        ).execute()
 
-        rows = result.get("values", [])
+        resultado = (
+            sheets
+            .spreadsheets()
+            .values()
+            .get(
+                spreadsheetId=SPREADSHEET_ID,
+                range=f"'{NOME_ABA}'!A:ZZ",
+            )
+            .execute()
+        )
+
+        rows = resultado.get(
+            "values",
+            []
+        )
 
         if not rows:
             return {}
 
+        # -------------------------------------------------
+        # CABEÇALHOS
+        # -------------------------------------------------
+
+        cabecalho_original = rows[0]
+
         cabecalho = [
-            normalizar(h)
-            for h in rows[0]
+            normalizar(
+                item
+            )
+            for item in cabecalho_original
         ]
 
-        codigo_busca = normalizar(codigo_imovel)
+        # -------------------------------------------------
+        # LOCALIZA A COLUNA CODIGO
+        # -------------------------------------------------
+
+        indice_codigo = None
+
+        for indice, nome in enumerate(
+            cabecalho
+        ):
+
+            if nome == "CODIGO":
+                indice_codigo = indice
+                break
+
+        if indice_codigo is None:
+
+            print(
+                "Coluna CODIGO não encontrada "
+                "na planilha.",
+                flush=True
+            )
+
+            return {}
+
+        codigo_busca = normalizar(
+            codigo_imovel
+        )
+
+        # -------------------------------------------------
+        # LOCALIZA O IMÓVEL
+        # -------------------------------------------------
 
         for row in rows[1:]:
+
             if not row:
                 continue
 
-            while len(row) < len(cabecalho):
-                row.append("")
+            # Completa a linha para ter
+            # o mesmo tamanho do cabeçalho.
 
-            if normalizar(row[0]) == codigo_busca:
-                return {
-                    cabecalho[i]: row[i]
-                    for i in range(len(cabecalho))
-                }
+            linha = list(row)
+
+            while len(linha) < len(cabecalho):
+
+                linha.append("")
+
+            valor_codigo = linha[
+                indice_codigo
+            ]
+
+            if (
+                normalizar(valor_codigo)
+                != codigo_busca
+            ):
+                continue
+
+            dados = {}
+
+            for indice, nome_campo in enumerate(
+                cabecalho
+            ):
+
+                if not nome_campo:
+                    continue
+
+                dados[nome_campo] = linha[
+                    indice
+                ]
+
+            return dados
 
         return {}
 
     except Exception as e:
+
         print(
             f"Erro ao ler Google Sheets: {e}",
             flush=True
         )
+
         return {}
 
 
-def get_dado(dados, *chaves, default=""):
-    """Retorna o primeiro valor preenchido. Sem informação, retorna vazio."""
+def get_dado(
+    dados,
+    *chaves,
+    default=""
+):
+    """
+    Retorna o primeiro valor preenchido
+    entre as chaves informadas.
+
+    Permite manter compatibilidade entre
+    nomes antigos e atuais.
+    """
+
+    if not dados:
+        return default
+
     for chave in chaves:
+
+        chave_normalizada = normalizar(
+            chave
+        )
+
         valor = dados.get(
-            normalizar(chave),
+            chave_normalizada,
             ""
         )
 
-        if valor not in ("", None):
+        if valor_preenchido(valor):
             return valor
 
     return default
 
 
-def valor_preenchido(valor):
-    """
-    True quando existe uma informação que realmente deve aparecer.
-    Valores como '-', 'n/a' e 'não informado' são tratados como vazios.
-    """
-    if valor in ("", None):
-        return False
-
-    texto = str(valor).strip().lower()
-
-    valores_vazios = {
-        "-",
-        "—",
-        "n/a",
-        "na",
-        "não informado",
-        "nao informado",
-        "não informado.",
-        "nao informado.",
-    }
-
-    return texto not in valores_vazios
-
-
-def valor_positivo(valor):
-    """
-    Para características numéricas.
-    Zero não aparece em itens como suítes, dormitórios, banheiros e vagas.
-    """
-    if not valor_preenchido(valor):
-        return False
-
-    texto = str(valor).strip().replace(",", ".")
-
-    try:
-        return float(texto) > 0
-
-    except ValueError:
-        # Se não for puramente numérico, mantém a informação.
-        return True
-
+# =========================================================
+# HTML
+# =========================================================
 
 HTML_LAYOUT = """
+
 <!DOCTYPE html>
+
 <html lang="pt-BR">
+
 <head>
+
     <meta charset="UTF-8">
 
     <style>
@@ -393,14 +809,17 @@ HTML_LAYOUT = """
             font-weight: 600;
         }
 
+
         @page {
             size: A4;
             margin: 0;
         }
 
+
         * {
             box-sizing: border-box;
         }
+
 
         body {
             margin: 0;
@@ -410,415 +829,722 @@ HTML_LAYOUT = """
             color: #1a1a1a;
         }
 
+
         .page {
+
             width: 210mm;
             height: 297mm;
+
             position: relative;
+
             overflow: hidden;
+
             background: #f4f1ea;
         }
 
+
         .sidebar-bg {
+
             position: absolute;
+
             top: 0;
             left: 0;
+
             width: 37%;
             height: 100%;
+
             background: #06192a;
+
             z-index: 1;
         }
+
 
         .photo-bg {
+
             position: absolute;
+
             top: 0;
             right: 0;
+
             width: 64%;
             height: 62%;
+
             overflow: hidden;
+
             z-index: 1;
         }
 
+
         .photo-bg img {
+
             width: 100%;
             height: 100%;
+
             object-fit: cover;
+
             display: block;
         }
 
+
         .sidebar-content {
+
             position: absolute;
+
             top: 0;
             left: 0;
+
             width: 36%;
             height: 60%;
+
             padding: 42px 24px 20px 24px;
+
             z-index: 2;
+
             overflow: hidden;
         }
 
+
         .logo-container {
+
             width: 100%;
+
             text-align: center;
+
             margin-bottom: 28px;
         }
 
+
         .logo-img {
+
             max-width: 151.8px;
             max-height: 79.2px;
+
             object-fit: contain;
+
             display: block;
+
             margin: 0 auto 14px auto;
         }
 
+
         .logo-symbol {
+
             font-size: 28pt;
+
             font-weight: 300;
+
             color: #e2e8f0;
+
             letter-spacing: -2px;
+
             margin-bottom: 2px;
         }
 
+
         .logo-title {
+
             font-family: 'Cormorant Garamond', serif;
+
             font-size: 15.5pt;
+
             letter-spacing: 2.8px;
+
             font-weight: 500;
+
             line-height: 1.18;
+
             color: #F7F5F0;
+
             text-transform: uppercase;
         }
 
+
         .logo-divider {
+
             width: 45px;
             height: 1px;
+
             background: #F7F5F0;
+
             margin: 8px auto 7px auto;
         }
 
+
         .logo-subtitle {
+
             font-size: 8pt;
+
             letter-spacing: 1.8px;
+
             color: #94a3b8;
+
             margin-top: 6px;
+
             text-transform: uppercase;
         }
 
+
         .header-info {
+
             width: 100%;
+
             margin-top: 4px;
         }
 
+
         .tipo-imovel {
+
             font-family: 'Cormorant Garamond', serif;
+
             width: 100%;
+
             font-size: 16pt;
+
             font-weight: 500;
+
             letter-spacing: 1.3px;
+
             color: #94a3b8;
+
             margin: 0;
+
             line-height: 1;
         }
+
 
         .destaque-imovel {
+
             font-family: 'Cormorant Garamond', serif;
+
             width: 100%;
+
             font-size: 22pt;
+
             font-weight: 600;
+
             letter-spacing: 1.1px;
-            margin-top: 3px;
+
             margin: 0;
+
             color: #F7F5F0;
+
             line-height: 1;
+
             overflow-wrap: anywhere;
         }
+
 
         .nome-imovel {
+
             width: 100%;
+
             font-size: 13pt;
+
             color: #F7F5F0;
+
             font-weight: 300;
+
             margin-top: 8px;
+
             letter-spacing: 0.8px;
+
             overflow-wrap: anywhere;
         }
 
+
         .valor-imovel {
+
             position: absolute;
+
             top: 400px;
             left: 18%;
+
             width: 60%;
+
             z-index: 100;
+
             font-size: 24pt;
+
             font-weight: 600;
+
             color: #F7F5F0;
+
             letter-spacing: 0.8px;
+
             text-align: center;
+
             white-space: nowrap;
         }
 
+
         .location-container {
+
             width: 100%;
+
             display: flex;
+
             align-items: flex-end;
+
             position: fixed;
+
             top: 580px;
+
             left: 45px;
         }
 
+
         .location-icon-box {
+
             width: 35px;
             height: 35px;
+
             margin-right: 8px;
+
             flex-shrink: 0;
+
             margin-top: 1px;
         }
 
+
         .location-icon-box svg {
+
             width: 100%;
             height: 100%;
         }
 
+
         .localizacao-topo {
+
             min-width: 0;
+
             font-size: 8.5pt;
+
             letter-spacing: 0.8px;
+
             color: #94a3b8;
+
             text-transform: uppercase;
+
             line-height: 1.4;
+
             overflow-wrap: anywhere;
         }
 
+
         .specs-card {
+
             position: absolute;
+
             top: 56.5%;
             left: 5.5%;
+
             width: 33.5%;
             height: 35.5%;
+
             background: #06192a;
+
             border: 1px solid #1e2d3d;
+
             border-radius: 2px;
+
             padding: 24px 18px;
+
             color: white;
-            box-shadow: -4px -4px 14px rgba(0, 0, 0, 0.18);
+
+            box-shadow:
+                -4px -4px 14px
+                rgba(0, 0, 0, 0.18);
+
             z-index: 10;
+
             display: flex;
+
             flex-direction: column;
+
             justify-content: space-around;
         }
 
+
         .spec-row {
+
             display: flex;
+
             align-items: center;
+
             min-width: 0;
+
             width: 100%;
         }
 
+
         .spec-icon-box {
+
             width: 32px;
             height: 32px;
+
             margin-right: 12px;
+
             flex-shrink: 0;
+
             display: flex;
+
             align-items: center;
+
             justify-content: center;
         }
 
+
         .spec-icon-box svg {
+
             width: 25px !important;
             height: 25px !important;
         }
 
+
         .spec-text-box {
+
             min-width: 0;
+
             display: flex;
+
             flex-direction: column;
         }
 
+
         .spec-label {
+
             font-size: 10pt;
+
             letter-spacing: 1px;
+
             color: #94a3b8;
+
             text-transform: uppercase;
+
             font-weight: 500;
+
             line-height: 1.15;
         }
 
+
         .spec-value {
+
             font-size: 13.5pt;
+
             font-weight: 400;
+
             margin-top: 3px;
+
             color: #ffffff;
+
             letter-spacing: 0.3px;
+
             line-height: 1.1;
+
             overflow-wrap: anywhere;
         }
 
+
         .spec-divider {
+
             height: 1px;
+
             background: #1a2b3c;
+
             width: 100%;
+
             flex-shrink: 0;
         }
 
+
         .details-area {
+
             position: absolute;
+
             top: 62%;
             right: 0;
+
             width: 62%;
             height: 31%;
-            padding: 20px 40px 10px 45px;
+
+            padding:
+                20px
+                40px
+                10px
+                45px;
+
             z-index: 2;
+
             display: flex;
+
             flex-direction: column;
+
             justify-content: space-between;
         }
 
+
         .description-wrapper {
-            border-left: 2px solid #06192a;
+
+            border-left:
+                2px solid #06192a;
+
             padding-left: 16px;
+
             margin-top: 5px;
         }
 
+
         .diferencial-destaque {
+
             font-size: 10pt;
+
             font-weight: 600;
+
             color: #06192a;
+
             letter-spacing: 1.1px;
+
             text-transform: uppercase;
+
             margin-bottom: 10px;
+
             display: block;
+
             line-height: 1.25;
         }
 
+
         .description {
+
             font-size: 10pt;
+
             line-height: 1.45;
+
             color: #2d3748;
+
             font-weight: 400;
         }
 
+
         .features-grid {
+
             width: 100%;
+
             display: flex;
+
             justify-content: space-between;
+
             align-items: flex-start;
-            padding: 5px 6px 0 6px;
+
+            padding:
+                5px
+                6px
+                0
+                6px;
         }
 
+
         .feature-item {
+
             flex: 1;
+
             min-width: 0;
+
             text-align: center;
+
             display: flex;
+
             flex-direction: column;
+
             align-items: center;
         }
 
+
         .feature-icon-box {
+
             width: 28px;
             height: 28px;
+
             margin-bottom: 7px;
+
             flex-shrink: 0;
         }
 
+
         .feature-icon-box svg {
+
             width: 100%;
             height: 100%;
         }
 
+
         .feature-value {
+
             font-size: 14pt;
+
             font-weight: bold;
+
             color: #06192a;
+
             line-height: 1;
+
             min-height: 14pt;
         }
 
+
         .feature-label {
+
             font-size: 9pt;
+
             letter-spacing: 0.8px;
+
             color: #94a3b8;
+
             margin-top: 5px;
+
             text-transform: uppercase;
+
             font-weight: 700;
+
             line-height: 1.15;
         }
 
+
         .footer-line {
+
             position: absolute;
+
             bottom: 45px;
+
             left: 5%;
+
             width: 90%;
-            border-top: 1px solid #94a3b8;
+
+            border-top:
+                1px solid #94a3b8;
+
             z-index: 2;
         }
+
 
         .footer-content {
+
             position: absolute;
+
             bottom: 15px;
+
             left: 5%;
+
             width: 90%;
+
             display: flex;
+
             justify-content: space-between;
+
             align-items: flex-end;
+
             font-size: 8pt;
+
             color: #94a3b8;
+
             letter-spacing: 0.5px;
+
             z-index: 2;
         }
 
+
         .footer-brand {
+
             font-weight: bold;
+
             color: #06192a;
+
             font-size: 9pt;
+
             letter-spacing: 1px;
         }
 
+
         .page-break {
+
             page-break-before: always;
+
             height: 297mm;
+
             width: 210mm;
+
             box-sizing: border-box;
+
             padding: 20mm;
+
             background: #f4f1ea;
+
             display: flex;
+
             flex-direction: column;
+
             justify-content: space-between;
         }
 
+
         .full-photo {
+
             width: 100%;
+
             height: 230mm;
+
             object-fit: contain;
+
             display: block;
         }
 
+
         .page-footer {
-            border-top: 1px solid #06192a;
+
+            border-top:
+                1px solid #06192a;
+
             padding-top: 12px;
+
             display: flex;
+
             justify-content: space-between;
+
             font-size: 11pt;
+
             font-weight: bold;
+
             color: #06192a;
         }
 
     </style>
+
 </head>
 
+
 <body>
+
 
     <div class="page">
 
         <div class="sidebar-bg"></div>
 
+
         <div class="photo-bg">
-            <img src="{{ foto_capa }}" alt="Capa">
+
+            <img
+                src="{{ foto_capa }}"
+                alt="Capa"
+            >
+
         </div>
+
 
         <div class="sidebar-content">
 
+
             <div class="logo-container">
+
 
                 {% if logo_uri %}
 
@@ -830,52 +1556,86 @@ HTML_LAYOUT = """
 
                 {% else %}
 
-                    <div class="logo-symbol">| •</div>
+                    <div class="logo-symbol">
+                        | •
+                    </div>
 
                 {% endif %}
 
+
                 <div class="logo-title">
+
                     CARVALHO<br>FERREIRA
+
                 </div>
+
 
                 <div class="logo-divider"></div>
 
+
                 <div class="logo-subtitle">
+
                     CONSULTORIA IMOBILIARIA
+
                 </div>
 
             </div>
 
+
             <div class="header-info">
 
+
                 <h1 class="tipo-imovel">
+
                     {{ titulo_1 }}
+
                 </h1>
+
 
                 <h1 class="destaque-imovel">
+
                     {{ titulo_2 }}
+
                 </h1>
 
+
                 <div class="nome-imovel">
+
                     {{ titulo_3 }}
+
                 </div>
 
-                {% if valor and valor != '-' %}
+
+                {% if valor %}
 
                     <div class="valor-imovel">
+
                         {{ valor }}
+
                     </div>
 
                 {% endif %}
 
+
                 <div class="location-container">
 
+
                     <div class="location-icon-box">
+
                         {{ svg_localizacao | safe }}
+
                     </div>
 
+
                     <div class="localizacao-topo">
-                        {{ bairro }}<br>{{ cidade_uf }}
+
+                        {{ bairro }}
+
+                        {% if cidade_uf %}
+                            <br>
+                            {{ cidade_uf }}
+                        {% endif %}
+
                     </div>
 
                 </div>
@@ -887,87 +1647,124 @@ HTML_LAYOUT = """
 
         {% if specs %}
 
-        <div class="specs-card">
+            <div class="specs-card">
 
-            {% for spec in specs %}
+                {% for spec in specs %}
 
-                <div class="spec-row">
 
-                    <div class="spec-icon-box">
-                        {{ spec.svg | safe }}
+                    <div class="spec-row">
+
+
+                        <div class="spec-icon-box">
+
+                            {{ spec.svg | safe }}
+
+                        </div>
+
+
+                        <div class="spec-text-box">
+
+
+                            <span class="spec-label">
+
+                                {{ spec.label }}
+
+                            </span>
+
+
+                            <span class="spec-value">
+
+                                {{ spec.valor }}
+
+                            </span>
+
+                        </div>
+
                     </div>
 
-                    <div class="spec-text-box">
 
-                        <span class="spec-label">
-                            {{ spec.label }}
-                        </span>
+                    {% if not loop.last %}
 
-                        <span class="spec-value">
-                            {{ spec.valor }}
-                        </span>
+                        <div class="spec-divider"></div>
 
-                    </div>
+                    {% endif %}
 
-                </div>
 
-                {% if not loop.last %}
+                {% endfor %}
 
-                    <div class="spec-divider"></div>
-
-                {% endif %}
-
-            {% endfor %}
-
-        </div>
+            </div>
 
         {% endif %}
 
 
         <div class="details-area">
 
+
             <div class="description-wrapper">
 
-                {% if observacao and observacao != '-' %}
+
+                {% if observacao %}
 
                     <span class="diferencial-destaque">
-                        DESTAQUES: {{ observacao }}
+
+                        DESTAQUES:
+                        {{ observacao }}
+
                     </span>
 
                 {% endif %}
 
-                <div class="description">
-                    {{ descricao }}
-                </div>
+
+                {% if descricao %}
+
+                    <div class="description">
+
+                        {{ descricao }}
+
+                    </div>
+
+                {% endif %}
 
             </div>
 
 
             {% if features %}
 
-            <div class="features-grid">
+                <div class="features-grid">
 
-                {% for feature in features %}
 
-                    <div class="feature-item">
+                    {% for feature in features %}
 
-                        <div class="feature-icon-box">
-                            {{ feature.svg | safe }}
+
+                        <div class="feature-item">
+
+
+                            <div class="feature-icon-box">
+
+                                {{ feature.svg | safe }}
+
+                            </div>
+
+
+                            <div class="feature-value">
+
+                                {{ feature.valor }}
+
+                            </div>
+
+
+                            <div class="feature-label">
+
+                                {{ feature.label }}
+
+                            </div>
+
                         </div>
 
-                        <div class="feature-value">
-                            {{ feature.valor }}
-                        </div>
 
-                        <div class="feature-label">
-                            {{ feature.label }}
-                        </div>
+                    {% endfor %}
 
-                    </div>
-
-                {% endfor %}
-
-            </div>
+                </div>
 
             {% endif %}
 
@@ -976,13 +1773,19 @@ HTML_LAYOUT = """
 
         <div class="footer-line"></div>
 
+
         <div class="footer-content">
+
 
             <div>
 
+
                 <div class="footer-brand">
+
                     CARVALHO FERREIRA
+
                 </div>
+
 
                 <div
                     style="
@@ -991,12 +1794,19 @@ HTML_LAYOUT = """
                         margin-top: 2px;
                     "
                 >
+
                     CARVALHO FERREIRA
+
                 </div>
 
             </div>
 
-            <div style="text-align: right;">
+
+            <div
+                style="
+                    text-align: right;
+                "
+            >
 
                 <div
                     style="
@@ -1004,7 +1814,9 @@ HTML_LAYOUT = """
                         color: #06192a;
                     "
                 >
+
                     CONSULTORIA IMOBILIARIA
+
                 </div>
 
             </div>
@@ -1016,128 +1828,194 @@ HTML_LAYOUT = """
 
     {% for foto in fotos_galeria %}
 
-    <div class="page-break">
 
-        <img
-            class="full-photo"
-            src="{{ foto }}"
-            alt="Foto"
-        >
+        <div class="page-break">
 
-        <div class="page-footer">
 
-            <div>
-                CARVALHO FERREIRA
-            </div>
+            <img
+                class="full-photo"
+                src="{{ foto }}"
+                alt="Foto"
+            >
 
-            <div>
-                CONSULTORIA IMOBILIARIA
+
+            <div class="page-footer">
+
+
+                <div>
+
+                    CARVALHO FERREIRA
+
+                </div>
+
+
+                <div>
+
+                    CONSULTORIA IMOBILIARIA
+
+                </div>
+
+
             </div>
 
         </div>
 
-    </div>
 
     {% endfor %}
 
+
 </body>
+
 </html>
+
 """
 
 
-def sanitizar_nome_arquivo(nome):
-    return re.sub(
-        r'[\\/*?:"<>|]',
-        "",
-        str(nome)
-    ).strip()
-
+# =========================================================
+# GERAÇÃO DO PDF
+# =========================================================
 
 def gerar_pdf(codigo_imovel):
     """
-    Retorna bytes do PDF, ou None.
-    Nao grava no Google Drive. Nao abre interface.
+    Retorna os bytes do PDF.
+
+    Não grava no Google Drive.
+    Não abre interface.
     """
+
+    # -----------------------------------------------------
+    # GOOGLE
+    # -----------------------------------------------------
 
     drive, sheets = conectar_google()
 
     if not drive or not sheets:
         return None
 
-    codigo_imovel = str(codigo_imovel).strip().upper()
+
+    codigo_imovel = str(
+        codigo_imovel
+    ).strip().upper()
+
 
     if not codigo_imovel:
         return None
+
+
+    # -----------------------------------------------------
+    # PLANILHA
+    # -----------------------------------------------------
 
     dados = ler_dados_sheets(
         sheets,
         codigo_imovel
     )
 
+
     if not dados:
+
         print(
-            f"Imovel '{codigo_imovel}' nao encontrado no Sheets.",
+            f"Imóvel '{codigo_imovel}' "
+            f"não encontrado no Sheets.",
             flush=True
         )
+
         return None
 
-    id_pasta_imovel = obter_id_pasta_imovel(
-        drive,
-        codigo_imovel
+
+    # -----------------------------------------------------
+    # PASTA DO IMÓVEL
+    # -----------------------------------------------------
+
+    id_pasta_imovel = (
+        obter_id_pasta_imovel(
+            drive,
+            codigo_imovel
+        )
     )
+
 
     if not id_pasta_imovel:
         return None
 
-    id_pasta_fotos = buscar_id_por_nome(
-        drive,
-        "FOTOS SELECIONADAS",
-        id_pasta_imovel
+
+    # -----------------------------------------------------
+    # FOTOS SELECIONADAS
+    # -----------------------------------------------------
+
+    id_pasta_fotos = (
+        buscar_id_por_nome(
+            drive,
+            "FOTOS SELECIONADAS",
+            id_pasta_imovel
+        )
     )
 
+
     if not id_pasta_fotos:
+
         print(
-            "Pasta FOTOS SELECIONADAS nao encontrada.",
+            "Pasta FOTOS SELECIONADAS "
+            "não encontrada.",
             flush=True
         )
+
         return None
+
 
     try:
 
         arquivos_fotos = []
+
         page_token = None
+
 
         while True:
 
-            resposta = drive.files().list(
-                q=(
-                    f"'{id_pasta_fotos}' in parents "
-                    f"and trashed = false"
-                ),
-                fields=(
-                    "nextPageToken, "
-                    "files(id, name, mimeType)"
-                ),
-                orderBy="name",
-                pageSize=1000,
-                pageToken=page_token,
-                supportsAllDrives=True,
-                includeItemsFromAllDrives=True,
-            ).execute()
+            resposta = (
+                drive
+                .files()
+                .list(
+                    q=(
+                        f"'{id_pasta_fotos}' "
+                        f"in parents "
+                        f"and trashed = false"
+                    ),
+                    fields=(
+                        "nextPageToken, "
+                        "files(id, name, mimeType)"
+                    ),
+                    orderBy="name",
+                    pageSize=1000,
+                    pageToken=page_token,
+                    supportsAllDrives=True,
+                    includeItemsFromAllDrives=True,
+                )
+                .execute()
+            )
+
 
             arquivos_fotos.extend(
-                resposta.get("files", [])
+                resposta.get(
+                    "files",
+                    []
+                )
             )
 
-            page_token = resposta.get(
-                "nextPageToken"
+
+            page_token = (
+                resposta.get(
+                    "nextPageToken"
+                )
             )
+
 
             if not page_token:
                 break
 
 
         fotos = []
+
 
         for arquivo in sorted(
             arquivos_fotos,
@@ -1147,28 +2025,39 @@ def gerar_pdf(codigo_imovel):
             ).lower()
         ):
 
+
             mime_type = arquivo.get(
                 "mimeType",
                 ""
             )
 
-            if not mime_type.startswith("image/"):
+
+            if not mime_type.startswith(
+                "image/"
+            ):
                 continue
+
 
             data = baixar_bytes(
                 drive,
                 arquivo["id"]
             )
 
+
             if not data:
                 continue
 
-            fotos.append(
-                bytes_para_data_uri(
-                    data,
-                    mime_type
-                )
+
+            data_uri = bytes_para_data_uri(
+                data,
+                mime_type
             )
+
+
+            if data_uri:
+                fotos.append(
+                    data_uri
+                )
 
 
     except Exception as e:
@@ -1184,7 +2073,7 @@ def gerar_pdf(codigo_imovel):
     if not fotos:
 
         print(
-            "Nenhuma foto valida encontrada.",
+            "Nenhuma foto válida encontrada.",
             flush=True
         )
 
@@ -1193,6 +2082,7 @@ def gerar_pdf(codigo_imovel):
 
     foto_capa = fotos[0]
 
+
     fotos_galeria = (
         fotos[1:]
         if len(fotos) > 1
@@ -1200,153 +2090,209 @@ def gerar_pdf(codigo_imovel):
     )
 
 
+    # =====================================================
+    # CAMPOS PRINCIPAIS
+    # =====================================================
+
     tipo_imovel = get_dado(
         dados,
         "TIPO",
         default="IMOVEL"
     )
 
-    tipo_lower = tipo_imovel.lower()
 
+    tipo_lower = str(
+        tipo_imovel
+    ).lower()
+
+
+    # =====================================================
+    # ESPECIFICAÇÕES LATERAIS
+    # =====================================================
 
     if "apartamento" in tipo_lower:
 
-        label_campo1, valor_campo1, icone_campo1 = (
-            "Area Util",
-            get_dado(
-                dados,
-                "AREA UTIL"
-            ),
-            "area.svg",
+        label_campo1 = "Área Útil"
+
+        valor_campo1 = get_dado(
+            dados,
+            "AREA UTIL"
         )
 
-        label_campo2, valor_campo2, icone_campo2 = (
-            "Andar",
-            get_dado(
-                dados,
-                "ANDAR"
-            ),
-            "andar.svg",
+        icone_campo1 = "area.svg"
+
+
+        label_campo2 = "Andar"
+
+        valor_campo2 = get_dado(
+            dados,
+            "ANDAR"
         )
 
-        label_campo3, valor_campo3, icone_campo3 = (
-            "IPTU",
-            get_dado(
-                dados,
-                "IPTU"
-            ),
-            "iptu.svg",
+        icone_campo2 = "andar.svg"
+
+
+        label_campo3 = "IPTU"
+
+        valor_campo3 = get_dado(
+            dados,
+            "IPTU"
         )
+
+        icone_campo3 = "iptu.svg"
+
 
     else:
 
-        label_campo1, valor_campo1, icone_campo1 = (
-            "Area Util",
-            get_dado(
-                dados,
-                "AREA UTIL"
-            ),
-            "area.svg",
+        label_campo1 = "Área Útil"
+
+        valor_campo1 = get_dado(
+            dados,
+            "AREA UTIL"
         )
 
-        label_campo2, valor_campo2, icone_campo2 = (
-            "Area do Terreno",
-            get_dado(
-                dados,
-                "AREA TOTAL"
-            ),
-            "terreno.svg",
+        icone_campo1 = "area.svg"
+
+
+        label_campo2 = "Área do Terreno"
+
+        valor_campo2 = get_dado(
+            dados,
+            "AREA TOTAL"
         )
 
-        label_campo3, valor_campo3, icone_campo3 = (
-            "IPTU",
-            get_dado(
-                dados,
-                "IPTU"
-            ),
-            "iptu.svg",
+        icone_campo2 = "terreno.svg"
+
+
+        label_campo3 = "IPTU"
+
+        valor_campo3 = get_dado(
+            dados,
+            "IPTU"
         )
 
+        icone_campo3 = "iptu.svg"
 
-    # Monta somente os campos laterais
-    # que realmente possuem informação.
 
     specs = []
 
 
-    if valor_preenchido(valor_campo1):
+    if valor_preenchido(
+        valor_campo1
+    ):
 
         specs.append({
-            "label": label_campo1,
-            "valor": valor_campo1,
-            "svg": carregar_icone_local(
-                icone_campo1,
-                "#f4f1ea"
-            ),
+
+            "label":
+                label_campo1,
+
+            "valor":
+                valor_campo1,
+
+            "svg":
+                carregar_icone_local(
+                    icone_campo1,
+                    "#f4f1ea"
+                ),
         })
 
 
-    if valor_preenchido(valor_campo2):
+    if valor_preenchido(
+        valor_campo2
+    ):
 
         specs.append({
-            "label": label_campo2,
-            "valor": valor_campo2,
-            "svg": carregar_icone_local(
-                icone_campo2,
-                "#f4f1ea"
-            ),
+
+            "label":
+                label_campo2,
+
+            "valor":
+                valor_campo2,
+
+            "svg":
+                carregar_icone_local(
+                    icone_campo2,
+                    "#f4f1ea"
+                ),
         })
 
 
-    if valor_preenchido(valor_campo3):
+    if valor_preenchido(
+        valor_campo3
+    ):
 
         specs.append({
-            "label": label_campo3,
-            "valor": valor_campo3,
-            "svg": carregar_icone_local(
-                icone_campo3,
-                "#f4f1ea"
-            ),
+
+            "label":
+                label_campo3,
+
+            "valor":
+                valor_campo3,
+
+            "svg":
+                carregar_icone_local(
+                    icone_campo3,
+                    "#f4f1ea"
+                ),
         })
 
 
-    # Condomínio
-    # Aparece junto com o IPTU quando estiver preenchido.
+    # -----------------------------------------------------
+    # CONDOMÍNIO
+    # -----------------------------------------------------
 
     condominio = get_dado(
         dados,
         "CONDOMINIO"
     )
 
-    if valor_preenchido(condominio):
+
+    if valor_preenchido(
+        condominio
+    ):
 
         specs.append({
-            "label": "Condomínio",
-            "valor": condominio,
-            "svg": carregar_icone_local(
-                "condominio.svg",
-                "#f4f1ea"
-            ),
+
+            "label":
+                "Condomínio",
+
+            "valor":
+                condominio,
+
+            "svg":
+                carregar_icone_local(
+                    "condominio.svg",
+                    "#f4f1ea"
+                ),
         })
 
 
-    # Monta somente as características
-    # com quantidade positiva.
+    # =====================================================
+    # CARACTERÍSTICAS
+    # =====================================================
 
     dormitorios = get_dado(
         dados,
         "DORMITORIOS"
     )
 
+
     suites = get_dado(
         dados,
         "SUITES"
     )
 
+
+    # IMPORTANTE:
+    # A coluna real da planilha é BANHEIRO.
+    # Mantemos BANHEIROS como compatibilidade.
+
     banheiros = get_dado(
         dados,
+        "BANHEIRO",
         "BANHEIROS"
     )
+
 
     vagas = get_dado(
         dados,
@@ -1357,63 +2303,191 @@ def gerar_pdf(codigo_imovel):
     features = []
 
 
-    if valor_positivo(dormitorios):
+    if valor_positivo(
+        dormitorios
+    ):
 
         features.append({
-            "valor": dormitorios,
-            "label": "Suites" if False else "Dormitorios",
-            "svg": carregar_icone_local(
-                "dormitorios.svg",
-                "#06192a"
-            ),
+
+            "valor":
+                dormitorios,
+
+            "label":
+                "Dormitórios",
+
+            "svg":
+                carregar_icone_local(
+                    "dormitorios.svg",
+                    "#06192a"
+                ),
         })
 
 
-    if valor_positivo(suites):
+    if valor_positivo(
+        suites
+    ):
 
         features.append({
-            "valor": suites,
-            "label": "Suites",
-            "svg": carregar_icone_local(
-                "suites.svg",
-                "#06192a"
-            ),
+
+            "valor":
+                suites,
+
+            "label":
+                "Suítes",
+
+            "svg":
+                carregar_icone_local(
+                    "suites.svg",
+                    "#06192a"
+                ),
         })
 
 
-    if valor_positivo(banheiros):
+    if valor_positivo(
+        banheiros
+    ):
 
         features.append({
-            "valor": banheiros,
-            "label": "Banheiros",
-            "svg": carregar_icone_local(
-                "banheiros.svg",
-                "#06192a"
-            ),
+
+            "valor":
+                banheiros,
+
+            "label":
+                "Banheiros",
+
+            "svg":
+                carregar_icone_local(
+                    "banheiros.svg",
+                    "#06192a"
+                ),
         })
 
 
-    if valor_positivo(vagas):
+    if valor_positivo(
+        vagas
+    ):
 
         features.append({
-            "valor": vagas,
-            "label": "Vagas",
-            "svg": carregar_icone_local(
-                "vagas.svg",
-                "#06192a"
-            ),
+
+            "valor":
+                vagas,
+
+            "label":
+                "Vagas",
+
+            "svg":
+                carregar_icone_local(
+                    "vagas.svg",
+                    "#06192a"
+                ),
         })
 
+
+    # =====================================================
+    # ENDEREÇO
+    # =====================================================
+
+    bairro = get_dado(
+        dados,
+        "BAIRRO"
+    )
+
+
+    cidade = get_dado(
+        dados,
+        "CIDADE"
+    )
+
+
+    uf = get_dado(
+        dados,
+        "UF",
+        "ESTADO"
+    )
+
+
+    if valor_preenchido(
+        uf
+    ):
+
+        cidade_uf = (
+            f"{cidade} / {uf}"
+            if valor_preenchido(cidade)
+            else str(uf)
+        )
+
+    else:
+
+        cidade_uf = cidade
+
+
+    # =====================================================
+    # CAMPOS DE PUBLICAÇÃO
+    # =====================================================
+    #
+    # Estas colunas agora podem existir na planilha:
+    #
+    # PUBLICAR NO PORTAL
+    # DESTAQUE
+    #
+    # Elas são lidas normalmente porque o gerador
+    # passou a ler todas as colunas.
+    #
+    # Não são inseridas automaticamente no PDF,
+    # porque o layout atual utiliza:
+    #
+    # OBS EXTRAS -> destaque do PDF
+    #
+    # DESCRICAO -> descrição do imóvel
+    #
+    # =====================================================
+
+    publicar_portal = get_dado(
+        dados,
+        "PUBLICAR NO PORTAL"
+    )
+
+
+    destaque_portal = get_dado(
+        dados,
+        "DESTAQUE"
+    )
+
+
+    # Mantidos disponíveis no dicionário
+    # sem interferir no layout atual.
+
+    _ = publicar_portal
+    _ = destaque_portal
+
+
+    # =====================================================
+    # HTML
+    # =====================================================
 
     html_rendered = Template(
         HTML_LAYOUT
     ).render(
 
+        # -------------------------------------------------
+        # FOTOS
+        # -------------------------------------------------
+
         foto_capa=foto_capa,
 
         fotos_galeria=fotos_galeria,
 
+
+        # -------------------------------------------------
+        # MARCA
+        # -------------------------------------------------
+
         logo_uri=buscar_logo_local(),
+
+
+        # -------------------------------------------------
+        # FONTES
+        # -------------------------------------------------
 
         fonte_cormorant_medium=fonte_local(
             "CORMORANT GARAMOND",
@@ -1440,14 +2514,29 @@ def gerar_pdf(codigo_imovel):
             "Manrope-SemiBold.ttf"
         ),
 
+
+        # -------------------------------------------------
+        # ÍCONE LOCALIZAÇÃO
+        # -------------------------------------------------
+
         svg_localizacao=carregar_icone_local(
             "localizacao.svg",
             "#f4f1ea"
         ),
 
+
+        # -------------------------------------------------
+        # CARDS
+        # -------------------------------------------------
+
         specs=specs,
 
         features=features,
+
+
+        # -------------------------------------------------
+        # TÍTULOS
+        # -------------------------------------------------
 
         titulo_1=get_dado(
             dados,
@@ -1464,20 +2553,29 @@ def gerar_pdf(codigo_imovel):
             "TITULO 3"
         ),
 
+
+        # -------------------------------------------------
+        # VALOR
+        # -------------------------------------------------
+
         valor=get_dado(
             dados,
             "VALOR"
         ),
 
-        bairro=get_dado(
-            dados,
-            "BAIRRO"
-        ),
 
-        cidade_uf=get_dado(
-            dados,
-            "CIDADE"
-        ),
+        # -------------------------------------------------
+        # LOCALIZAÇÃO
+        # -------------------------------------------------
+
+        bairro=bairro,
+
+        cidade_uf=cidade_uf,
+
+
+        # -------------------------------------------------
+        # TEXTO
+        # -------------------------------------------------
 
         observacao=get_dado(
             dados,
@@ -1491,7 +2589,12 @@ def gerar_pdf(codigo_imovel):
     )
 
 
+    # =====================================================
+    # WEASYPRINT
+    # =====================================================
+
     pdf_buffer = io.BytesIO()
+
 
     weasyprint.HTML(
         string=html_rendered,
@@ -1500,13 +2603,21 @@ def gerar_pdf(codigo_imovel):
         pdf_buffer
     )
 
-    pdf_bytes = pdf_buffer.getvalue()
 
+    pdf_bytes = (
+        pdf_buffer.getvalue()
+    )
+
+
+    # =====================================================
+    # VALIDAÇÃO
+    # =====================================================
 
     if len(pdf_bytes) < 10000:
 
         print(
-            "PDF gerado parece vazio ou incompleto.",
+            "PDF gerado parece vazio "
+            "ou incompleto.",
             flush=True
         )
 
