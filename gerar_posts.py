@@ -30,6 +30,9 @@ ID_PASTA_MARCA = "19b_7n4ER-hmFyhvMmFIO1pBmPlRu85aA"
 SPREADSHEET_ID = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
 NOME_ABA = "Imoveis"
 
+# Intervalo amplo para acompanhar o crescimento da planilha.
+RANGE_PLANILHA = "A:AZ"
+
 COR_AZUL_ESCURO = "#0A1F2E"
 COR_AZUL_BLOCO = "#0D2538"
 COR_OFF_WHITE = "#F7F5F0"
@@ -540,7 +543,7 @@ def ler_dados_sheets(
         .values()
         .get(
             spreadsheetId=SPREADSHEET_ID,
-            range=f"'{NOME_ABA}'!A:Z",
+            range=f"'{NOME_ABA}'!{RANGE_PLANILHA}",
         )
         .execute()
     )
@@ -553,6 +556,8 @@ def ler_dados_sheets(
     if not rows:
         return {}
 
+    # A posição da coluna não importa.
+    # O cabeçalho vira a chave usada para localizar cada informação.
     cab = [
         normalizar(h)
         for h in rows[0]
@@ -587,13 +592,15 @@ def ler_dados_sheets(
 def get_dado(
     dados,
     *chaves,
-    default="-",
+    default="",
 ):
 
     for c in chaves:
 
+        chave = normalizar(c)
+
         v = dados.get(
-            normalizar(c),
+            chave,
             "",
         )
 
@@ -602,9 +609,303 @@ def get_dado(
             None,
         ):
 
-            return v
+            valor = str(v).strip()
+
+            if valor:
+                return valor
 
     return default
+
+
+def tem_dado(
+    dados,
+    *chaves,
+):
+
+    valor = get_dado(
+        dados,
+        *chaves,
+        default="",
+    )
+
+    return bool(
+        str(valor).strip()
+    )
+
+
+# =============================================================================
+# TÍTULOS
+# =============================================================================
+
+def montar_titulo_completo(
+    dados,
+):
+
+    partes = []
+
+    for chave in [
+        "TITULO 1",
+        "TITULO 2",
+        "TITULO 3",
+    ]:
+
+        valor = get_dado(
+            dados,
+            chave,
+            default="",
+        )
+
+        if valor:
+            partes.append(
+                valor.strip()
+            )
+
+    return " ".join(partes)
+
+
+# =============================================================================
+# FICHA TÉCNICA INTELIGENTE
+# =============================================================================
+
+def montar_ficha_tecnica(
+    dados,
+):
+
+    itens = []
+
+    usados = set()
+
+    def adicionar(
+        label,
+        valor,
+        chave=None,
+    ):
+
+        if not valor:
+            return False
+
+        valor = str(valor).strip()
+
+        if not valor:
+            return False
+
+        identificador = (
+            chave or label
+        )
+
+        if identificador in usados:
+            return False
+
+        itens.append(
+            {
+                "label": label,
+                "valor": valor,
+                "chave": identificador,
+            }
+        )
+
+        usados.add(
+            identificador
+        )
+
+        return True
+
+    # -------------------------------------------------------------------------
+    # 1. Dormitórios
+    # -------------------------------------------------------------------------
+
+    adicionar(
+        "Dormitorios",
+        get_dado(
+            dados,
+            "DORMITORIOS",
+        ),
+        "DORMITORIOS",
+    )
+
+    # -------------------------------------------------------------------------
+    # 2. Suítes
+    #
+    # Se não houver suíte, usa ANDAR.
+    # Isso evita que um apartamento fique com um card vazio.
+    # -------------------------------------------------------------------------
+
+    suites = get_dado(
+        dados,
+        "SUITES",
+        default="",
+    )
+
+    if suites:
+
+        adicionar(
+            "Suites",
+            suites,
+            "SUITES",
+        )
+
+    else:
+
+        andar = get_dado(
+            dados,
+            "ANDAR",
+            default="",
+        )
+
+        if andar:
+
+            adicionar(
+                "Andar",
+                andar,
+                "ANDAR",
+            )
+
+    # -------------------------------------------------------------------------
+    # 3. Banheiros
+    # -------------------------------------------------------------------------
+
+    adicionar(
+        "Banheiros",
+        get_dado(
+            dados,
+            "BANHEIROS",
+        ),
+        "BANHEIROS",
+    )
+
+    # -------------------------------------------------------------------------
+    # 4. Vagas
+    # -------------------------------------------------------------------------
+
+    adicionar(
+        "Vagas",
+        get_dado(
+            dados,
+            "VAGAS",
+        ),
+        "VAGAS",
+    )
+
+    # -------------------------------------------------------------------------
+    # 5. Área
+    #
+    # Prioridade:
+    # Área útil
+    # Área total
+    # -------------------------------------------------------------------------
+
+    area_util = get_dado(
+        dados,
+        "AREA UTIL",
+        default="",
+    )
+
+    area_total = get_dado(
+        dados,
+        "AREA TOTAL",
+        default="",
+    )
+
+    if area_util:
+
+        adicionar(
+            "Area util",
+            area_util,
+            "AREA UTIL",
+        )
+
+    elif area_total:
+
+        adicionar(
+            "Area total",
+            area_total,
+            "AREA TOTAL",
+        )
+
+    # -------------------------------------------------------------------------
+    # 6. Condomínio
+    #
+    # Se não existir condomínio, usa IPTU.
+    # -------------------------------------------------------------------------
+
+    condominio = get_dado(
+        dados,
+        "CONDOMINIO",
+        default="",
+    )
+
+    if condominio:
+
+        adicionar(
+            "Condominio",
+            condominio,
+            "CONDOMINIO",
+        )
+
+    else:
+
+        iptu = get_dado(
+            dados,
+            "IPTU",
+            default="",
+        )
+
+        if iptu:
+
+            adicionar(
+                "IPTU",
+                iptu,
+                "IPTU",
+            )
+
+    # -------------------------------------------------------------------------
+    # Caso algum dos seis espaços ainda esteja disponível, procura outras
+    # informações úteis antes de permitir que apareça um "-".
+    # -------------------------------------------------------------------------
+
+    alternativas = [
+        (
+            "Andar",
+            "ANDAR",
+            "ANDAR",
+        ),
+        (
+            "Condominio",
+            "CONDOMINIO",
+            "CONDOMINIO",
+        ),
+        (
+            "IPTU",
+            "IPTU",
+            "IPTU",
+        ),
+        (
+            "Area total",
+            "AREA TOTAL",
+            "AREA TOTAL",
+        ),
+    ]
+
+    for label, chave, identificador in alternativas:
+
+        if len(itens) >= 6:
+            break
+
+        valor = get_dado(
+            dados,
+            chave,
+            default="",
+        )
+
+        if valor:
+
+            adicionar(
+                label,
+                valor,
+                identificador,
+            )
+
+    return itens[:6]
 
 
 # =============================================================================
@@ -819,7 +1120,7 @@ def renderizar_png(
 
 
 # =============================================================================
-# CSS CARD
+# CSS CARD PRINCIPAL
 # =============================================================================
 
 def css_card_principal():
@@ -855,7 +1156,7 @@ def css_card_principal():
 
 
 # =============================================================================
-# LÂMINAS
+# LÂMINA DE CAPA
 # =============================================================================
 
 def gerar_lamina_capa(
@@ -928,6 +1229,7 @@ def gerar_lamina_capa(
     }}
 
     .tipo {{
+        display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
         font-size: 38px;
         font-weight: 500;
@@ -937,6 +1239,7 @@ def gerar_lamina_capa(
     }}
 
     .destaque {{
+        display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
         font-size: 45px;
         font-weight: 500;
@@ -1076,6 +1379,10 @@ def gerar_lamina_capa(
     )
 
 
+# =============================================================================
+# LÂMINAS DE FOTO
+# =============================================================================
+
 def gerar_lamina_foto(
     ctx,
     foto,
@@ -1163,9 +1470,35 @@ def gerar_lamina_foto(
     )
 
 
+# =============================================================================
+# FICHA TÉCNICA
+# =============================================================================
+
 def gerar_lamina_ficha(
     ctx,
 ):
+
+    cards_html = ""
+
+    for item in ctx["ficha_tecnica"]:
+
+        cards_html += f"""
+        <div class="card">
+
+            <div class="icone">
+                {item["icone"]}
+            </div>
+
+            <div class="label">
+                {item["label"]}
+            </div>
+
+            <div class="valor">
+                {item["valor"]}
+            </div>
+
+        </div>
+        """
 
     html = f"""
     <html>
@@ -1269,41 +1602,7 @@ def gerar_lamina_ficha(
 
         <div class="grid">
 
-            <div class="card">
-                <div class="icone">{ctx['svg_dorm']}</div>
-                <div class="label">Dormitorios</div>
-                <div class="valor">{ctx['dormitorios']}</div>
-            </div>
-
-            <div class="card">
-                <div class="icone">{ctx['svg_suites']}</div>
-                <div class="label">Suites</div>
-                <div class="valor">{ctx['suites']}</div>
-            </div>
-
-            <div class="card">
-                <div class="icone">{ctx['svg_banheiros']}</div>
-                <div class="label">Banheiros</div>
-                <div class="valor">{ctx['banheiros']}</div>
-            </div>
-
-            <div class="card">
-                <div class="icone">{ctx['svg_vagas']}</div>
-                <div class="label">Vagas</div>
-                <div class="valor">{ctx['vagas']}</div>
-            </div>
-
-            <div class="card">
-                <div class="icone">{ctx['svg_area']}</div>
-                <div class="label">Area util</div>
-                <div class="valor">{ctx['area']}</div>
-            </div>
-
-            <div class="card">
-                <div class="icone">{ctx['svg_condominio']}</div>
-                <div class="label">Condominio</div>
-                <div class="valor">{ctx['condominio']}</div>
-            </div>
+            {cards_html}
 
         </div>
 
@@ -1321,6 +1620,10 @@ def gerar_lamina_ficha(
         1350,
     )
 
+
+# =============================================================================
+# LÂMINA FINAL
+# =============================================================================
 
 def gerar_lamina_final(
     ctx,
@@ -1449,197 +1752,6 @@ def gerar_lamina_final(
     )
 
 
-def gerar_thumbnail(
-    ctx,
-    foto,
-):
-
-    nome_html = (
-        f"<span class='nome'>{ctx['titulo_3']}</span>"
-        if ctx["titulo_3"]
-        else ""
-    )
-
-    foto_uri = imagem_uri(
-        foto["bytes"],
-        foto["nome"],
-    )
-
-    condominio_html = (
-        f"<div class='condominio-texto'>Condomínio: {ctx['condominio']}</div>"
-        if ctx["condominio"] and ctx["condominio"] != "-"
-        else ""
-    )
-
-    html = f"""
-    <html>
-    <head>
-    <meta charset="UTF-8">
-
-    <style>
-
-    {ctx['css_fontes']}
-
-    @page {{
-        size: 1080px 1350px;
-        margin: 0;
-    }}
-
-    * {{
-        box-sizing: border-box;
-    }}
-
-    body {{
-        margin: 0;
-        width: 1080px;
-        height: 1350px;
-        background: {COR_OFF_WHITE};
-        overflow: hidden;
-        font-family: 'Manrope', Arial, sans-serif;
-    }}
-
-    .foto {{
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 1080px;
-        height: 1350px;
-        padding: 20px;
-        object-fit: contain;
-    }}
-
-    {css_card_principal()}
-
-    .titulo {{
-        font-size: 38px;
-        line-height: 1.15;
-    }}
-
-    .tipo {{
-        font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 36px;
-        font-weight: 500;
-        letter-spacing: 2px;
-        text-transform: uppercase;
-        color: {COR_OFF_WHITE};
-    }}
-
-    .destaque {{
-        font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 45px;
-        font-weight: 500;
-        letter-spacing: 2px;
-        text-transform: uppercase;
-        color: {COR_OFF_WHITE};
-    }}
-
-    .nome {{
-        display: block;
-        margin-top: 3px;
-        font-size: 27px;
-        font-weight: 400;
-        color: {COR_OFF_WHITE};
-    }}
-
-    .local {{
-        margin-top: 20px;
-        font-size: 17px;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        color: {COR_AZUL_SUAVE};
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }}
-
-    .valor {{
-        margin-top: 19px;
-        font-size: 42px;
-        font-weight: 600;
-        color: {COR_OFF_WHITE};
-    }}
-
-    .condominio-texto {{
-        margin-top: 3px;
-        font-size: 15px;
-        color: {COR_AZUL_SUAVE};
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }}
-
-    .marca {{
-        margin-top: 20px;
-        padding-top: 14px;
-        border-top: 1px solid rgba(255,255,255,.3);
-        font-size: 13px;
-        letter-spacing: 2px;
-        font-weight: 600;
-        color: {COR_OFF_WHITE};
-    }}
-
-    </style>
-    </head>
-
-    <body>
-
-        <img class="foto" src="{foto_uri}">
-
-        <div class="card-fundo"></div>
-
-        <div class="card-azul">
-
-            <div class="card-conteudo">
-
-                <div class="titulo">
-
-                    <span class="tipo">
-                        {ctx['titulo_1']}
-                    </span>
-
-                    <span class="destaque">
-                        {ctx['titulo_2']}
-                    </span>
-
-                    {nome_html}
-
-                </div>
-
-                <div class="local">
-
-                    {ctx['pin']}
-
-                    <span>
-                        {ctx['bairro']} • {ctx['cidade']}
-                    </span>
-
-                </div>
-
-                <div class="valor">
-                    {ctx['valor']}
-                </div>
-
-                {condominio_html}
-
-                <div class="marca">
-                    CARVALHO FERREIRA
-                </div>
-
-            </div>
-
-        </div>
-
-    </body>
-    </html>
-    """
-
-    return renderizar_png(
-        html,
-        1080,
-        1350,
-    )
-
-
 # =============================================================================
 # STORIES
 # =============================================================================
@@ -1737,6 +1849,7 @@ def gerar_stories(
         }}
 
         .tipo {{
+            display: block;
             font-family: 'Cormorant Garamond', Georgia, serif;
             font-size: 36px;
             font-weight: 500;
@@ -1745,6 +1858,7 @@ def gerar_stories(
         }}
 
         .destaque {{
+            display: block;
             font-family: 'Cormorant Garamond', Georgia, serif;
             font-size: 45px;
             font-weight: 500;
@@ -1928,13 +2042,122 @@ def gerar_posts(
 
         return None
 
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------------------
     # ATIVOS DA MARCA
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------------------
 
     logo_bytes = buscar_logo_bytes(
         drive
     )
+
+    # -------------------------------------------------------------------------
+    # DADOS PRINCIPAIS
+    # -------------------------------------------------------------------------
+
+    titulo_1 = get_dado(
+        dados,
+        "TITULO 1",
+        default="",
+    )
+
+    titulo_2 = get_dado(
+        dados,
+        "TITULO 2",
+        default="",
+    )
+
+    titulo_3 = get_dado(
+        dados,
+        "TITULO 3",
+        default="",
+    )
+
+    # -------------------------------------------------------------------------
+    # FICHA TÉCNICA
+    # -------------------------------------------------------------------------
+
+    ficha = montar_ficha_tecnica(
+        dados
+    )
+
+    # Associação dos ícones aos campos.
+    mapa_icones = {
+        "DORMITORIOS":
+            carregar_icone_bytes(
+                drive,
+                "dormitorios.svg",
+                COR_OFF_WHITE,
+            ),
+
+        "SUITES":
+            carregar_icone_bytes(
+                drive,
+                "suites.svg",
+                COR_OFF_WHITE,
+            ),
+
+        "BANHEIROS":
+            carregar_icone_bytes(
+                drive,
+                "banheiros.svg",
+                COR_OFF_WHITE,
+            ),
+
+        "VAGAS":
+            carregar_icone_bytes(
+                drive,
+                "vagas.svg",
+                COR_OFF_WHITE,
+            ),
+
+        "AREA UTIL":
+            carregar_icone_bytes(
+                drive,
+                "area.svg",
+                COR_OFF_WHITE,
+            ),
+
+        "AREA TOTAL":
+            carregar_icone_bytes(
+                drive,
+                "area.svg",
+                COR_OFF_WHITE,
+            ),
+
+        "CONDOMINIO":
+            carregar_icone_bytes(
+                drive,
+                "condominio.svg",
+                COR_OFF_WHITE,
+            ),
+
+        "IPTU":
+            carregar_icone_bytes(
+                drive,
+                "condominio.svg",
+                COR_OFF_WHITE,
+            ),
+
+        "ANDAR":
+            carregar_icone_bytes(
+                drive,
+                "area.svg",
+                COR_OFF_WHITE,
+            ),
+    }
+
+    for item in ficha:
+
+        chave = item["chave"]
+
+        item["icone"] = mapa_icones.get(
+            chave,
+            "",
+        )
+
+    # -------------------------------------------------------------------------
+    # CONTEXTO
+    # -------------------------------------------------------------------------
 
     ctx = {
         "codigo": codigo,
@@ -1956,24 +2179,17 @@ def gerar_posts(
             ),
 
         "titulo_1":
-            get_dado(
-                dados,
-                "TITULO 1",
-                default="",
-            ),
+            titulo_1,
 
         "titulo_2":
-            get_dado(
-                dados,
-                "TITULO 2",
-                default="",
-            ),
+            titulo_2,
 
         "titulo_3":
-            get_dado(
-                dados,
-                "TITULO 3",
-                default="",
+            titulo_3,
+
+        "titulo_completo":
+            montar_titulo_completo(
+                dados
             ),
 
         "valor":
@@ -1986,6 +2202,13 @@ def gerar_posts(
             get_dado(
                 dados,
                 "CONDOMINIO",
+                default="",
+            ),
+
+        "iptu":
+            get_dado(
+                dados,
+                "IPTU",
                 default="",
             ),
 
@@ -2007,101 +2230,60 @@ def gerar_posts(
             get_dado(
                 dados,
                 "DORMITORIOS",
+                default="-",
             ),
 
         "suites":
             get_dado(
                 dados,
                 "SUITES",
-                default="-",
+                default="",
             ),
 
         "banheiros":
             get_dado(
                 dados,
                 "BANHEIROS",
+                default="-",
             ),
 
         "vagas":
             get_dado(
                 dados,
                 "VAGAS",
+                default="-",
             ),
 
         "area":
             get_dado(
                 dados,
                 "AREA UTIL",
+                "AREA TOTAL",
+                default="-",
             ),
 
         "terreno":
             get_dado(
                 dados,
                 "AREA TOTAL",
+                default="",
             ),
 
-        "svg_dorm":
-            carregar_icone_bytes(
-                drive,
-                "dormitorios.svg",
-                COR_OFF_WHITE,
-            ),
-
-        "svg_suites":
-            carregar_icone_bytes(
-                drive,
-                "suites.svg",
-                COR_OFF_WHITE,
-            ),
-
-        "svg_banheiros":
-            carregar_icone_bytes(
-                drive,
-                "banheiros.svg",
-                COR_OFF_WHITE,
-            ),
-
-        "svg_vagas":
-            carregar_icone_bytes(
-                drive,
-                "vagas.svg",
-                COR_OFF_WHITE,
-            ),
-
-        "svg_area":
-            carregar_icone_bytes(
-                drive,
-                "area.svg",
-                COR_OFF_WHITE,
-            ),
-
-        "svg_condominio":
-            carregar_icone_bytes(
-                drive,
-                "condominio.svg",
-                COR_OFF_WHITE,
-            ),
+        "ficha_tecnica":
+            ficha,
     }
 
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------------------
     # GERAÇÃO EM MEMÓRIA
-    # ---------------------------------------------------------
+    #
+    # A THUMBNAIL FOI REMOVIDA.
+    # -------------------------------------------------------------------------
 
     arquivos = []
 
-    # Thumbnail
-
-    arquivos.append(
-        (
-            f"thumbnail_{codigo}.png",
-            gerar_thumbnail(
-                ctx,
-                fotos[0],
-            ),
-        )
-    )
-
-    # Capa
+    # -------------------------------------------------------------------------
+    # CAPA
+    # -------------------------------------------------------------------------
 
     arquivos.append(
         (
@@ -2113,7 +2295,9 @@ def gerar_posts(
         )
     )
 
-    # Fotos do carrossel
+    # -------------------------------------------------------------------------
+    # FOTOS DO CARROSSEL
+    # -------------------------------------------------------------------------
 
     numero = 2
 
@@ -2125,13 +2309,15 @@ def gerar_posts(
                 gerar_lamina_foto(
                     ctx,
                     foto,
-                ),
+                )
             )
         )
 
         numero += 1
 
-    # Ficha técnica
+    # -------------------------------------------------------------------------
+    # FICHA TÉCNICA
+    # -------------------------------------------------------------------------
 
     arquivos.append(
         (
@@ -2144,7 +2330,9 @@ def gerar_posts(
 
     numero += 1
 
-    # Final
+    # -------------------------------------------------------------------------
+    # LÂMINA FINAL
+    # -------------------------------------------------------------------------
 
     arquivos.append(
         (
@@ -2155,7 +2343,9 @@ def gerar_posts(
         )
     )
 
-    # Stories
+    # -------------------------------------------------------------------------
+    # STORIES
+    # -------------------------------------------------------------------------
 
     arquivos.extend(
         gerar_stories(
@@ -2164,9 +2354,9 @@ def gerar_posts(
         )
     )
 
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------------------
     # ZIP TOTALMENTE EM MEMÓRIA
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------------------
 
     zip_buffer = io.BytesIO()
 
