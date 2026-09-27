@@ -30,8 +30,8 @@ ID_PASTA_MARCA = "19b_7n4ER-hmFyhvMmFIO1pBmPlRu85aA"
 SPREADSHEET_ID = "1nVEpOZFYFKcq0MXtOwxn22nqxafmJBHnf6zhHQlyT8w"
 NOME_ABA = "Imoveis"
 
-# Intervalo amplo para acompanhar o crescimento da planilha.
-RANGE_PLANILHA = "A:AZ"
+# Faixa ampla para não ficar limitada às primeiras colunas.
+RANGE_SHEETS = f"'{NOME_ABA}'!A:ZZ"
 
 COR_AZUL_ESCURO = "#0A1F2E"
 COR_AZUL_BLOCO = "#0D2538"
@@ -513,6 +513,28 @@ def icone_pin(
     """
 
 
+def icone_generico(
+    cor,
+):
+
+    return f"""
+    <svg width="31" height="31"
+         viewBox="0 0 24 24"
+         fill="none"
+         stroke="{cor}"
+         stroke-width="1.8"
+         stroke-linecap="round"
+         stroke-linejoin="round">
+
+        <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+        <path d="M8 9h8"></path>
+        <path d="M8 13h8"></path>
+        <path d="M8 17h5"></path>
+
+    </svg>
+    """
+
+
 # =============================================================================
 # PLANILHA
 # =============================================================================
@@ -543,7 +565,7 @@ def ler_dados_sheets(
         .values()
         .get(
             spreadsheetId=SPREADSHEET_ID,
-            range=f"'{NOME_ABA}'!{RANGE_PLANILHA}",
+            range=RANGE_SHEETS,
         )
         .execute()
     )
@@ -556,8 +578,6 @@ def ler_dados_sheets(
     if not rows:
         return {}
 
-    # A posição da coluna não importa.
-    # O cabeçalho vira a chave usada para localizar cada informação.
     cab = [
         normalizar(h)
         for h in rows[0]
@@ -595,12 +615,15 @@ def get_dado(
     default="",
 ):
 
+    if not dados:
+        return default
+
     for c in chaves:
 
-        chave = normalizar(c)
+        chave_normalizada = normalizar(c)
 
         v = dados.get(
-            chave,
+            chave_normalizada,
             "",
         )
 
@@ -609,28 +632,12 @@ def get_dado(
             None,
         ):
 
-            valor = str(v).strip()
+            texto = str(v).strip()
 
-            if valor:
-                return valor
+            if texto:
+                return texto
 
     return default
-
-
-def tem_dado(
-    dados,
-    *chaves,
-):
-
-    valor = get_dado(
-        dados,
-        *chaves,
-        default="",
-    )
-
-    return bool(
-        str(valor).strip()
-    )
 
 
 # =============================================================================
@@ -638,274 +645,65 @@ def tem_dado(
 # =============================================================================
 
 def montar_titulo_completo(
-    dados,
+    ctx,
 ):
 
     partes = []
 
     for chave in [
-        "TITULO 1",
-        "TITULO 2",
-        "TITULO 3",
+        "titulo_1",
+        "titulo_2",
+        "titulo_3",
     ]:
 
-        valor = get_dado(
-            dados,
-            chave,
-            default="",
-        )
+        valor = (
+            ctx.get(chave, "")
+            or ""
+        ).strip()
 
         if valor:
-            partes.append(
-                valor.strip()
-            )
+            partes.append(valor)
 
     return " ".join(partes)
 
 
-# =============================================================================
-# FICHA TÉCNICA INTELIGENTE
-# =============================================================================
-
-def montar_ficha_tecnica(
-    dados,
+def montar_titulo_html(
+    ctx,
 ):
 
-    itens = []
+    partes = []
 
-    usados = set()
+    titulo_1 = (
+        ctx.get("titulo_1", "")
+        or ""
+    ).strip()
 
-    def adicionar(
-        label,
-        valor,
-        chave=None,
-    ):
+    titulo_2 = (
+        ctx.get("titulo_2", "")
+        or ""
+    ).strip()
 
-        if not valor:
-            return False
+    titulo_3 = (
+        ctx.get("titulo_3", "")
+        or ""
+    ).strip()
 
-        valor = str(valor).strip()
-
-        if not valor:
-            return False
-
-        identificador = (
-            chave or label
+    if titulo_1:
+        partes.append(
+            f"<span class='tipo'>{titulo_1}</span>"
         )
 
-        if identificador in usados:
-            return False
-
-        itens.append(
-            {
-                "label": label,
-                "valor": valor,
-                "chave": identificador,
-            }
+    if titulo_2:
+        partes.append(
+            f"<span class='destaque'>{titulo_2}</span>"
         )
 
-        usados.add(
-            identificador
+    if titulo_3:
+        partes.append(
+            f"<span class='nome'>{titulo_3}</span>"
         )
 
-        return True
-
-    # -------------------------------------------------------------------------
-    # 1. Dormitórios
-    # -------------------------------------------------------------------------
-
-    adicionar(
-        "Dormitorios",
-        get_dado(
-            dados,
-            "DORMITORIOS",
-        ),
-        "DORMITORIOS",
-    )
-
-    # -------------------------------------------------------------------------
-    # 2. Suítes
-    #
-    # Se não houver suíte, usa ANDAR.
-    # Isso evita que um apartamento fique com um card vazio.
-    # -------------------------------------------------------------------------
-
-    suites = get_dado(
-        dados,
-        "SUITES",
-        default="",
-    )
-
-    if suites:
-
-        adicionar(
-            "Suites",
-            suites,
-            "SUITES",
-        )
-
-    else:
-
-        andar = get_dado(
-            dados,
-            "ANDAR",
-            default="",
-        )
-
-        if andar:
-
-            adicionar(
-                "Andar",
-                andar,
-                "ANDAR",
-            )
-
-    # -------------------------------------------------------------------------
-    # 3. Banheiros
-    # -------------------------------------------------------------------------
-
-    adicionar(
-        "Banheiros",
-        get_dado(
-            dados,
-            "BANHEIROS",
-        ),
-        "BANHEIROS",
-    )
-
-    # -------------------------------------------------------------------------
-    # 4. Vagas
-    # -------------------------------------------------------------------------
-
-    adicionar(
-        "Vagas",
-        get_dado(
-            dados,
-            "VAGAS",
-        ),
-        "VAGAS",
-    )
-
-    # -------------------------------------------------------------------------
-    # 5. Área
-    #
-    # Prioridade:
-    # Área útil
-    # Área total
-    # -------------------------------------------------------------------------
-
-    area_util = get_dado(
-        dados,
-        "AREA UTIL",
-        default="",
-    )
-
-    area_total = get_dado(
-        dados,
-        "AREA TOTAL",
-        default="",
-    )
-
-    if area_util:
-
-        adicionar(
-            "Area util",
-            area_util,
-            "AREA UTIL",
-        )
-
-    elif area_total:
-
-        adicionar(
-            "Area total",
-            area_total,
-            "AREA TOTAL",
-        )
-
-    # -------------------------------------------------------------------------
-    # 6. Condomínio
-    #
-    # Se não existir condomínio, usa IPTU.
-    # -------------------------------------------------------------------------
-
-    condominio = get_dado(
-        dados,
-        "CONDOMINIO",
-        default="",
-    )
-
-    if condominio:
-
-        adicionar(
-            "Condominio",
-            condominio,
-            "CONDOMINIO",
-        )
-
-    else:
-
-        iptu = get_dado(
-            dados,
-            "IPTU",
-            default="",
-        )
-
-        if iptu:
-
-            adicionar(
-                "IPTU",
-                iptu,
-                "IPTU",
-            )
-
-    # -------------------------------------------------------------------------
-    # Caso algum dos seis espaços ainda esteja disponível, procura outras
-    # informações úteis antes de permitir que apareça um "-".
-    # -------------------------------------------------------------------------
-
-    alternativas = [
-        (
-            "Andar",
-            "ANDAR",
-            "ANDAR",
-        ),
-        (
-            "Condominio",
-            "CONDOMINIO",
-            "CONDOMINIO",
-        ),
-        (
-            "IPTU",
-            "IPTU",
-            "IPTU",
-        ),
-        (
-            "Area total",
-            "AREA TOTAL",
-            "AREA TOTAL",
-        ),
-    ]
-
-    for label, chave, identificador in alternativas:
-
-        if len(itens) >= 6:
-            break
-
-        valor = get_dado(
-            dados,
-            chave,
-            default="",
-        )
-
-        if valor:
-
-            adicionar(
-                label,
-                valor,
-                identificador,
-            )
-
-    return itens[:6]
+    return "\n".join(partes)
 
 
 # =============================================================================
@@ -1164,20 +962,18 @@ def gerar_lamina_capa(
     foto,
 ):
 
-    nome_html = (
-        f"<span class='nome'>{ctx['titulo_3']}</span>"
-        if ctx["titulo_3"]
-        else ""
-    )
-
     foto_uri = imagem_uri(
         foto["bytes"],
         foto["nome"],
     )
 
+    titulo_html = montar_titulo_html(
+        ctx
+    )
+
     condominio_html = (
         f"<div class='condominio-texto'>Condomínio: {ctx['condominio']}</div>"
-        if ctx["condominio"] and ctx["condominio"] != "-"
+        if ctx["condominio"]
         else ""
     )
 
@@ -1215,7 +1011,6 @@ def gerar_lamina_capa(
         width: 1080px;
         height: 1350px;
         padding: 20px;
-        box-sizing: border-box;
         object-fit: contain;
         display: block;
     }}
@@ -1322,15 +1117,7 @@ def gerar_lamina_capa(
 
                 <div class="titulo">
 
-                    <span class="tipo">
-                        {ctx['titulo_1']}
-                    </span>
-
-                    <span class="destaque">
-                        {ctx['titulo_2']}
-                    </span>
-
-                    {nome_html}
+                    {titulo_html}
 
                 </div>
 
@@ -1380,7 +1167,7 @@ def gerar_lamina_capa(
 
 
 # =============================================================================
-# LÂMINAS DE FOTO
+# LÂMINA DE FOTO
 # =============================================================================
 
 def gerar_lamina_foto(
@@ -1474,13 +1261,117 @@ def gerar_lamina_foto(
 # FICHA TÉCNICA
 # =============================================================================
 
+def montar_especificacoes(
+    ctx,
+):
+
+    especificacoes = []
+
+    # 1. Dormitórios
+    if ctx["dormitorios"]:
+        especificacoes.append(
+            {
+                "label": "Dormitórios",
+                "valor": ctx["dormitorios"],
+                "icone": ctx["svg_dorm"],
+            }
+        )
+
+    # 2. Suítes
+    if ctx["suites"]:
+        especificacoes.append(
+            {
+                "label": "Suítes",
+                "valor": ctx["suites"],
+                "icone": ctx["svg_suites"],
+            }
+        )
+
+    # Se não houver suítes, usa andar.
+    elif ctx["andar"]:
+        especificacoes.append(
+            {
+                "label": "Andar",
+                "valor": ctx["andar"],
+                "icone": ctx["svg_andar"],
+            }
+        )
+
+    # 3. Banheiros
+    if ctx["banheiros"]:
+        especificacoes.append(
+            {
+                "label": "Banheiros",
+                "valor": ctx["banheiros"],
+                "icone": ctx["svg_banheiros"],
+            }
+        )
+
+    # 4. Vagas
+    if ctx["vagas"]:
+        especificacoes.append(
+            {
+                "label": "Vagas",
+                "valor": ctx["vagas"],
+                "icone": ctx["svg_vagas"],
+            }
+        )
+
+    # 5. Área útil
+    if ctx["area"]:
+        especificacoes.append(
+            {
+                "label": "Área útil",
+                "valor": ctx["area"],
+                "icone": ctx["svg_area"],
+            }
+        )
+
+    # 6. Condomínio
+    if ctx["condominio"]:
+        especificacoes.append(
+            {
+                "label": "Condomínio",
+                "valor": ctx["condominio"],
+                "icone": ctx["svg_condominio"],
+            }
+        )
+
+    # Se ainda houver espaço, usa IPTU.
+    if len(especificacoes) < 6 and ctx["iptu"]:
+        especificacoes.append(
+            {
+                "label": "IPTU",
+                "valor": ctx["iptu"],
+                "icone": ctx["svg_iptu"],
+            }
+        )
+
+    # Se ainda houver espaço, usa Área Total.
+    if len(especificacoes) < 6 and ctx["area_total"]:
+        especificacoes.append(
+            {
+                "label": "Área total",
+                "valor": ctx["area_total"],
+                "icone": ctx["svg_area_total"],
+            }
+        )
+
+    # Limita aos 6 cards disponíveis.
+    return especificacoes[:6]
+
+
 def gerar_lamina_ficha(
     ctx,
 ):
 
+    especificacoes = montar_especificacoes(
+        ctx
+    )
+
     cards_html = ""
 
-    for item in ctx["ficha_tecnica"]:
+    for item in especificacoes:
 
         cards_html += f"""
         <div class="card">
@@ -1527,6 +1418,7 @@ def gerar_lamina_ficha(
         color: {COR_OFF_WHITE};
         font-family: 'Manrope', Arial, sans-serif;
         overflow: hidden;
+        position: relative;
     }}
 
     .titulo {{
@@ -1578,14 +1470,19 @@ def gerar_lamina_ficha(
         line-height: 1;
     }}
 
+    /*
+    Marca presa no fundo do card.
+    A linha continua acima da marca.
+    */
     .rodape {{
         position: absolute;
         left: 65px;
         right: 65px;
-        bottom: 50px;
-        padding-top: 22px;
-        border-top: 1px solid #D8DDE2;
+        bottom: 4px;
+        padding-top: 18px;
+        border-top: 1px solid rgba(255,255,255,.3);
         font-size: 13px;
+        line-height: 1;
         letter-spacing: 2px;
         color: {COR_AZUL_SUAVE};
         text-transform: uppercase;
@@ -1597,7 +1494,7 @@ def gerar_lamina_ficha(
     <body>
 
         <div class="titulo">
-            ESPECIFICACOES
+            ESPECIFICAÇÕES
         </div>
 
         <div class="grid">
@@ -1607,7 +1504,7 @@ def gerar_lamina_ficha(
         </div>
 
         <div class="rodape">
-            CARVALHO FERREIRA • CONSULTORIA IMOBILIARIA
+            CARVALHO FERREIRA • CONSULTORIA IMOBILIÁRIA
         </div>
 
     </body>
@@ -1725,7 +1622,7 @@ def gerar_lamina_final(
             {logo_html}
 
             <div class="submarca">
-                CARVALHO FERREIRA • CONSULTORIA IMOBILIARIA
+                CARVALHO FERREIRA • CONSULTORIA IMOBILIÁRIA
             </div>
 
         </div>
@@ -1733,8 +1630,8 @@ def gerar_lamina_final(
         <div class="centro">
 
             <div class="titulo">
-                TALVEZ ESTE SEJA O IMOVEL.<br>
-                QUE VOCE ESTAVA PROCURANDO.
+                TALVEZ ESTE SEJA O IMÓVEL.<br>
+                QUE VOCÊ ESTAVA PROCURANDO.
             </div>
 
             <div class="linha"></div>
@@ -1768,20 +1665,18 @@ def gerar_stories(
         start=1,
     ):
 
-        nome_html = (
-            f"<span class='nome'>{ctx['titulo_3']}</span>"
-            if ctx["titulo_3"]
-            else ""
-        )
-
         foto_uri = imagem_uri(
             foto["bytes"],
             foto["nome"],
         )
 
+        titulo_html = montar_titulo_html(
+            ctx
+        )
+
         condominio_story_html = (
             f"<div>Cond. {ctx['condominio']}</div>"
-            if ctx["condominio"] and ctx["condominio"] != "-"
+            if ctx["condominio"]
             else ""
         )
 
@@ -1904,9 +1799,9 @@ def gerar_stories(
         }}
 
         .marca {{
-            padding-top: 10px;
-            bottom: 4px;
-            border-top: 1px solid rgba(155,255,255,.3);
+            margin-top: 30px;
+            padding-top: 18px;
+            border-top: 1px solid rgba(255,255,255,.3);
             font-size: 14px;
             letter-spacing: 2px;
             font-weight: 600;
@@ -1925,15 +1820,7 @@ def gerar_stories(
 
                 <div class="titulo">
 
-                    <span class="tipo">
-                        {ctx['titulo_1']}
-                    </span>
-
-                    <span class="destaque">
-                        {ctx['titulo_2']}
-                    </span>
-
-                    {nome_html}
+                    {titulo_html}
 
                 </div>
 
@@ -2042,122 +1929,104 @@ def gerar_posts(
 
         return None
 
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
     # ATIVOS DA MARCA
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
 
     logo_bytes = buscar_logo_bytes(
         drive
     )
 
-    # -------------------------------------------------------------------------
-    # DADOS PRINCIPAIS
-    # -------------------------------------------------------------------------
-
-    titulo_1 = get_dado(
-        dados,
-        "TITULO 1",
-        default="",
+    svg_dorm = carregar_icone_bytes(
+        drive,
+        "dormitorios.svg",
+        COR_OFF_WHITE,
     )
 
-    titulo_2 = get_dado(
-        dados,
-        "TITULO 2",
-        default="",
+    svg_suites = carregar_icone_bytes(
+        drive,
+        "suites.svg",
+        COR_OFF_WHITE,
     )
 
-    titulo_3 = get_dado(
-        dados,
-        "TITULO 3",
-        default="",
+    svg_banheiros = carregar_icone_bytes(
+        drive,
+        "banheiros.svg",
+        COR_OFF_WHITE,
     )
 
-    # -------------------------------------------------------------------------
-    # FICHA TÉCNICA
-    # -------------------------------------------------------------------------
-
-    ficha = montar_ficha_tecnica(
-        dados
+    svg_vagas = carregar_icone_bytes(
+        drive,
+        "vagas.svg",
+        COR_OFF_WHITE,
     )
 
-    # Associação dos ícones aos campos.
-    mapa_icones = {
-        "DORMITORIOS":
-            carregar_icone_bytes(
-                drive,
-                "dormitorios.svg",
-                COR_OFF_WHITE,
-            ),
+    svg_area = carregar_icone_bytes(
+        drive,
+        "area.svg",
+        COR_OFF_WHITE,
+    )
 
-        "SUITES":
-            carregar_icone_bytes(
-                drive,
-                "suites.svg",
-                COR_OFF_WHITE,
-            ),
+    svg_condominio = carregar_icone_bytes(
+        drive,
+        "condominio.svg",
+        COR_OFF_WHITE,
+    )
 
-        "BANHEIROS":
-            carregar_icone_bytes(
-                drive,
-                "banheiros.svg",
-                COR_OFF_WHITE,
-            ),
+    svg_andar = carregar_icone_bytes(
+        drive,
+        "andar.svg",
+        COR_OFF_WHITE,
+    )
 
-        "VAGAS":
-            carregar_icone_bytes(
-                drive,
-                "vagas.svg",
-                COR_OFF_WHITE,
-            ),
+    svg_iptu = carregar_icone_bytes(
+        drive,
+        "iptu.svg",
+        COR_OFF_WHITE,
+    )
 
-        "AREA UTIL":
-            carregar_icone_bytes(
-                drive,
-                "area.svg",
-                COR_OFF_WHITE,
-            ),
+    svg_area_total = carregar_icone_bytes(
+        drive,
+        "area_total.svg",
+        COR_OFF_WHITE,
+    )
 
-        "AREA TOTAL":
-            carregar_icone_bytes(
-                drive,
-                "area.svg",
-                COR_OFF_WHITE,
-            ),
+    # Caso algum desses ícones ainda não exista na pasta da marca,
+    # utiliza um ícone genérico para não quebrar a geração.
+    svg_generico = icone_generico(
+        COR_OFF_WHITE
+    )
 
-        "CONDOMINIO":
-            carregar_icone_bytes(
-                drive,
-                "condominio.svg",
-                COR_OFF_WHITE,
-            ),
+    if not svg_dorm:
+        svg_dorm = svg_generico
 
-        "IPTU":
-            carregar_icone_bytes(
-                drive,
-                "condominio.svg",
-                COR_OFF_WHITE,
-            ),
+    if not svg_suites:
+        svg_suites = svg_generico
 
-        "ANDAR":
-            carregar_icone_bytes(
-                drive,
-                "area.svg",
-                COR_OFF_WHITE,
-            ),
-    }
+    if not svg_banheiros:
+        svg_banheiros = svg_generico
 
-    for item in ficha:
+    if not svg_vagas:
+        svg_vagas = svg_generico
 
-        chave = item["chave"]
+    if not svg_area:
+        svg_area = svg_generico
 
-        item["icone"] = mapa_icones.get(
-            chave,
-            "",
-        )
+    if not svg_condominio:
+        svg_condominio = svg_generico
 
-    # -------------------------------------------------------------------------
-    # CONTEXTO
-    # -------------------------------------------------------------------------
+    if not svg_andar:
+        svg_andar = svg_generico
+
+    if not svg_iptu:
+        svg_iptu = svg_generico
+
+    if not svg_area_total:
+        svg_area_total = svg_generico
+
+    # ---------------------------------------------------------
+    # DADOS
+    # ---------------------------------------------------------
 
     ctx = {
         "codigo": codigo,
@@ -2179,111 +2048,139 @@ def gerar_posts(
             ),
 
         "titulo_1":
-            titulo_1,
+            get_dado(
+                dados,
+                "TITULO 1",
+            ),
 
         "titulo_2":
-            titulo_2,
+            get_dado(
+                dados,
+                "TITULO 2",
+            ),
 
         "titulo_3":
-            titulo_3,
-
-        "titulo_completo":
-            montar_titulo_completo(
-                dados
+            get_dado(
+                dados,
+                "TITULO 3",
             ),
 
         "valor":
             get_dado(
                 dados,
                 "VALOR",
+                "PREÇO",
+                "PRECO",
             ),
 
         "condominio":
             get_dado(
                 dados,
                 "CONDOMINIO",
-                default="",
+                "CONDOMÍNIO",
             ),
 
         "iptu":
             get_dado(
                 dados,
                 "IPTU",
-                default="",
             ),
 
         "bairro":
             get_dado(
                 dados,
                 "BAIRRO",
-                default="",
             ),
 
         "cidade":
             get_dado(
                 dados,
                 "CIDADE",
-                default="",
             ),
 
         "dormitorios":
             get_dado(
                 dados,
                 "DORMITORIOS",
-                default="-",
+                "DORMITÓRIOS",
             ),
 
         "suites":
             get_dado(
                 dados,
                 "SUITES",
-                default="",
+                "SUÍTES",
             ),
 
         "banheiros":
             get_dado(
                 dados,
                 "BANHEIROS",
-                default="-",
             ),
 
         "vagas":
             get_dado(
                 dados,
                 "VAGAS",
-                default="-",
             ),
 
         "area":
             get_dado(
                 dados,
                 "AREA UTIL",
-                "AREA TOTAL",
-                default="-",
+                "ÁREA ÚTIL",
             ),
 
-        "terreno":
+        "area_total":
             get_dado(
                 dados,
                 "AREA TOTAL",
-                default="",
+                "ÁREA TOTAL",
             ),
 
-        "ficha_tecnica":
-            ficha,
+        "andar":
+            get_dado(
+                dados,
+                "ANDAR",
+            ),
+
+        "svg_dorm":
+            svg_dorm,
+
+        "svg_suites":
+            svg_suites,
+
+        "svg_banheiros":
+            svg_banheiros,
+
+        "svg_vagas":
+            svg_vagas,
+
+        "svg_area":
+            svg_area,
+
+        "svg_condominio":
+            svg_condominio,
+
+        "svg_andar":
+            svg_andar,
+
+        "svg_iptu":
+            svg_iptu,
+
+        "svg_area_total":
+            svg_area_total,
     }
 
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
     # GERAÇÃO EM MEMÓRIA
-    #
-    # A THUMBNAIL FOI REMOVIDA.
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
 
     arquivos = []
 
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
     # CAPA
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
 
     arquivos.append(
         (
@@ -2295,9 +2192,9 @@ def gerar_posts(
         )
     )
 
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
     # FOTOS DO CARROSSEL
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
 
     numero = 2
 
@@ -2315,9 +2212,9 @@ def gerar_posts(
 
         numero += 1
 
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
     # FICHA TÉCNICA
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
 
     arquivos.append(
         (
@@ -2330,9 +2227,9 @@ def gerar_posts(
 
     numero += 1
 
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
     # LÂMINA FINAL
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
 
     arquivos.append(
         (
@@ -2343,9 +2240,9 @@ def gerar_posts(
         )
     )
 
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
     # STORIES
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
 
     arquivos.extend(
         gerar_stories(
@@ -2354,9 +2251,9 @@ def gerar_posts(
         )
     )
 
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
     # ZIP TOTALMENTE EM MEMÓRIA
-    # -------------------------------------------------------------------------
+    # ---------------------------------------------------------
 
     zip_buffer = io.BytesIO()
 
