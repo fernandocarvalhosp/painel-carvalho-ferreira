@@ -1832,7 +1832,7 @@ def gerar_stories(
         }}
 
         .card-azul {{
-            position: relative;
+            position: absolute;
             left: 0;
             bottom: 51px;
             width: 900px;
