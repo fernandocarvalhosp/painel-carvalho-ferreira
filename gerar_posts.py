@@ -1905,7 +1905,7 @@ def gerar_stories(
 
         .marca {{
             padding-top: 10px;
-            margin-bottom: 4px;
+            margin-bottom: 1px;
             border-top: 1px solid rgba(155,255,255,.3);
             font-size: 14px;
             letter-spacing: 2px;
