@@ -38,9 +38,15 @@ except Exception as e:
 
 
 try:
-    import gerar_posts
+    import gerador_carrossel
 except Exception:
-    gerar_posts = None
+    gerador_carrossel = None
+
+
+try:
+    import gerador_capa_reels
+except Exception:
+    gerador_capa_reels = None
 
 
 try:
@@ -597,26 +603,26 @@ def executar_gerador_dossie(
 
 
 # =========================================================
-# GERADOR DE POSTS
+# GERADOR DE CARROSSEL
 # =========================================================
 
-def executar_gerador_posts(codigo_imovel):
+def executar_gerador_carrossel(codigo_imovel):
 
-    if gerar_posts is None:
+    if gerador_carrossel is None:
 
         return (
             False,
-            "Modulo gerar_posts nao encontrado."
+            "Módulo gerador_carrossel não encontrado."
         )
 
     try:
 
         importlib.reload(
-            gerar_posts
+            gerador_carrossel
         )
 
         resultado = (
-            gerar_posts.gerar_posts(
+            gerador_carrossel.gerar_carrossel(
                 codigo_imovel
             )
         )
@@ -631,23 +637,64 @@ def executar_gerador_posts(codigo_imovel):
 
             return True, resultado
 
-        if (
-            isinstance(resultado, str)
-            and Path(resultado).exists()
-        ):
-
-            return True, resultado
-
         return (
             False,
-            "Falha ao gerar os posts."
+            "Falha ao gerar o carrossel."
         )
 
     except Exception as e:
 
         return (
             False,
-            f"Erro ao gerar posts: {e}"
+            f"Erro ao gerar carrossel: {e}"
+        )
+
+
+# =========================================================
+# GERADOR DE CAPA PARA REELS
+# =========================================================
+
+def executar_gerador_capa_reels(codigo_imovel):
+
+    if gerador_capa_reels is None:
+
+        return (
+            False,
+            "Módulo gerador_capa_reels não encontrado."
+        )
+
+    try:
+
+        importlib.reload(
+            gerador_capa_reels
+        )
+
+        resultado = (
+            gerador_capa_reels.gerar_capa_para_reels(
+                codigo_imovel
+            )
+        )
+
+        if (
+            isinstance(
+                resultado,
+                (bytes, bytearray)
+            )
+            and len(resultado) > 1000
+        ):
+
+            return True, resultado
+
+        return (
+            False,
+            "Falha ao gerar a capa para Reels."
+        )
+
+    except Exception as e:
+
+        return (
+            False,
+            f"Erro ao gerar capa para Reels: {e}"
         )
 
 
@@ -824,6 +871,10 @@ for var, val in [
     ("pdf_bytes", None),
 
     ("pdf_nome", "imovel.pdf"),
+
+    ("carrossel_resultado", None),
+
+    ("capa_reels_resultado", None),
 
 ]:
 
@@ -1071,13 +1122,13 @@ if st.session_state.get(
 
 
 # =========================================================
-# POSTS
+# CARROSSEL
 # =========================================================
 
 if st.sidebar.button(
-    "Gerar Posts",
+    "Gerar Carrossel",
     use_container_width=True,
-    key="btn_posts"
+    key="btn_carrossel"
 ):
 
     if not codigo_busca:
@@ -1089,11 +1140,11 @@ if st.sidebar.button(
     else:
 
         with st.spinner(
-            "Gerando posts..."
+            "Gerando carrossel..."
         ):
 
             ok, res = (
-                executar_gerador_posts(
+                executar_gerador_carrossel(
                     codigo_busca
                 )
             )
@@ -1101,11 +1152,11 @@ if st.sidebar.button(
         if ok:
 
             st.session_state[
-                "posts_resultado"
+                "carrossel_resultado"
             ] = res
 
             st.sidebar.success(
-                "Posts gerados."
+                "Carrossel gerado."
             )
 
         else:
@@ -1115,68 +1166,111 @@ if st.sidebar.button(
             )
 
 
-if (
-    st.session_state.get(
-        "posts_resultado"
-    )
-    is not None
-):
+if st.session_state.get(
+    "carrossel_resultado"
+) is not None:
 
-    posts_res = (
-        st.session_state[
-            "posts_resultado"
-        ]
-    )
+    carrossel_res = st.session_state[
+        "carrossel_resultado"
+    ]
 
     if isinstance(
-        posts_res,
+        carrossel_res,
         (bytes, bytearray)
     ):
 
         st.sidebar.download_button(
 
-            "Baixar Posts (ZIP)",
+            "Baixar Carrossel (ZIP)",
 
-            data=posts_res,
+            data=carrossel_res,
 
             file_name=(
-                f"posts_{codigo_busca}.zip"
+                f"carrossel_{codigo_busca}.zip"
             ),
 
             mime="application/zip",
 
             use_container_width=True,
 
-            key="dl_posts_bytes",
+            key="dl_carrossel_bytes",
+        )
+
+
+# =========================================================
+# CAPA PARA REELS
+# =========================================================
+
+if st.sidebar.button(
+    "Gerar Capa Reels",
+    use_container_width=True,
+    key="btn_capa_reels"
+):
+
+    if not codigo_busca:
+
+        st.sidebar.error(
+            "Informe o codigo."
         )
 
     else:
 
-        caminho = Path(
-            str(posts_res)
-        )
+        with st.spinner(
+            "Gerando capa para Reels..."
+        ):
 
-        if caminho.exists():
-
-            with open(
-                caminho,
-                "rb"
-            ) as f:
-
-                st.sidebar.download_button(
-
-                    "Baixar Posts (ZIP)",
-
-                    data=f.read(),
-
-                    file_name=caminho.name,
-
-                    mime="application/zip",
-
-                    use_container_width=True,
-
-                    key="dl_posts_path",
+            ok, res = (
+                executar_gerador_capa_reels(
+                    codigo_busca
                 )
+            )
+
+        if ok:
+
+            st.session_state[
+                "capa_reels_resultado"
+            ] = res
+
+            st.sidebar.success(
+                "Capa para Reels gerada."
+            )
+
+        else:
+
+            st.sidebar.error(
+                res
+            )
+
+
+if st.session_state.get(
+    "capa_reels_resultado"
+) is not None:
+
+    capa_res = st.session_state[
+        "capa_reels_resultado"
+    ]
+
+    if isinstance(
+        capa_res,
+        (bytes, bytearray)
+    ):
+
+        st.sidebar.download_button(
+
+            "Baixar Capa Reels (ZIP)",
+
+            data=capa_res,
+
+            file_name=(
+                f"capa_reels_{codigo_busca}.zip"
+            ),
+
+            mime="application/zip",
+
+            use_container_width=True,
+
+            key="dl_capa_reels_bytes",
+        )
 
 
 # =========================================================
