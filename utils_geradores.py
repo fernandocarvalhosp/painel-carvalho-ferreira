@@ -924,22 +924,19 @@ def carregar_fotos(
     if not id_imovel:
         return []
 
+    # Apenas fotos escolhidas manualmente pelo usuário.
     id_fotos = buscar_id_por_nome(
         drive,
-        "FOTOS TRATADAS",
+        "FOTOS SELECIONADAS",
         id_imovel,
     )
 
     if not id_fotos:
-
-        id_fotos = buscar_id_por_nome(
-            drive,
-            "FOTOS SELECIONADAS",
-            id_imovel,
+        print(
+            f"Pasta 'FOTOS SELECIONADAS' não encontrada no imóvel '{codigo}'.",
+            flush=True,
         )
-
-    if not id_fotos:
-        id_fotos = id_imovel
+        return []
 
     files = []
 
