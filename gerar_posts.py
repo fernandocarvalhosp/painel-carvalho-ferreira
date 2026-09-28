@@ -1731,7 +1731,7 @@ def gerar_stories(
             left: 0;
             bottom: 51px;
             width: 900px;
-            height: 441px;
+            height: 446px;
             background: {COR_AZUL_ESCURO};
             z-index: 3;
             padding: 60px 62px 45px 62px;
