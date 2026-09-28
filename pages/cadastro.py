@@ -7,6 +7,9 @@ from pathlib import Path
 # =========================================================
 # RAIZ DO PROJETO
 # =========================================================
+# cadastro.py fica em pages/ → a raiz é o diretório pai.
+# Assim os módulos da raiz (gerador_*, utils_*, drive_service)
+# são encontrados corretamente.
 
 raiz_projeto = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..")
@@ -29,6 +32,8 @@ import gerador_pdf
 # =========================================================
 
 erro_import_dossie = None
+erro_import_carrossel = None
+erro_import_capa_reels = None
 
 try:
     import gerador_dossie
@@ -39,14 +44,16 @@ except Exception as e:
 
 try:
     import gerador_carrossel
-except Exception:
+except Exception as e:
     gerador_carrossel = None
+    erro_import_carrossel = str(e)
 
 
 try:
     import gerador_capa_reels
-except Exception:
+except Exception as e:
     gerador_capa_reels = None
+    erro_import_capa_reels = str(e)
 
 
 try:
@@ -610,9 +617,15 @@ def executar_gerador_carrossel(codigo_imovel):
 
     if gerador_carrossel is None:
 
+        detalhe = (
+            f" ({erro_import_carrossel})"
+            if erro_import_carrossel
+            else ""
+        )
+
         return (
             False,
-            "Módulo gerador_carrossel não encontrado."
+            f"Módulo gerador_carrossel não encontrado{detalhe}."
         )
 
     try:
@@ -658,9 +671,15 @@ def executar_gerador_capa_reels(codigo_imovel):
 
     if gerador_capa_reels is None:
 
+        detalhe = (
+            f" ({erro_import_capa_reels})"
+            if erro_import_capa_reels
+            else ""
+        )
+
         return (
             False,
-            "Módulo gerador_capa_reels não encontrado."
+            f"Módulo gerador_capa_reels não encontrado{detalhe}."
         )
 
     try:
