@@ -118,7 +118,7 @@ def gerar_capa_reels(
         display: flex;
         flex-direction: column;
         justify-content: flex-start;
-        max-width: 490px;
+        max-width: 700px;
     }}
 
     .coluna-direita {{
@@ -135,7 +135,7 @@ def gerar_capa_reels(
     .tipo {{
         display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 38px;
+        font-size: 45px;
         font-weight: 500;
         letter-spacing: 1.5px;
         text-transform: uppercase;
@@ -144,7 +144,7 @@ def gerar_capa_reels(
     .destaque {{
         display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 42px;
+        font-size: 50px;
         font-weight: 600;
         letter-spacing: 1.5px;
         text-transform: uppercase;
@@ -154,7 +154,7 @@ def gerar_capa_reels(
     .nome {{
         display: block;
         margin-top: 4px;
-        font-size: 24px;
+        font-size: 30px;
         color: {COR_OFF_WHITE};
         font-weight: 400;
     }}
