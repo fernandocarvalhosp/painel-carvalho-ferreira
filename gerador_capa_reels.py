@@ -160,7 +160,7 @@ def gerar_capa_reels(
     }}
 
     .local {{
-        matgin-top: 6px;
+        magin-top: 6px;
         font-size: 18px;
         letter-spacing: 1.2px;
         color: {COR_AZUL_SUAVE};
