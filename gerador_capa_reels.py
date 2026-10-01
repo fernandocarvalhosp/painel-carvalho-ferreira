@@ -81,11 +81,11 @@ def gerar_capa_reels(
     .card-fundo {{
         position: absolute;
         left: 0;
-        bottom: 430px;
+        bottom: 445px;
         width: 780px;
         height: 40px;
         background: {COR_OFF_WHITE};
-        z-index: 5;
+        z-index: 2;
     }}
 
     /* Card azul principal */
