@@ -90,7 +90,7 @@ def gerar_capa_reels(
 
     /* Card azul principal */
     .card-azul {{
-        position: relative;
+        position: absolute;
         left: 0;
         bottom: 50px;
         width: 900px;
