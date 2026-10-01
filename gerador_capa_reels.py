@@ -90,7 +90,7 @@ def gerar_capa_reels(
 
     /* Card azul principal */
     .card-azul {{
-        position: absolute;
+        position: relative;
         left: 0;
         bottom: 50px;
         width: 900px;
@@ -205,7 +205,10 @@ def gerar_capa_reels(
     /* ----- Rodapé fixo ----- */
 
     .rodape {{
-        margin-bottom: 2px;
+        position: absolute;
+        bottom: 0;
+        left: 48px;
+        right: 48px;
         padding: 16px 0 20px 0;
         border-top: 1px solid rgba(226, 232, 240, 0.25);
         display: flex;
