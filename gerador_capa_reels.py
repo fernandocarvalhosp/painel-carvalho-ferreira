@@ -101,6 +101,7 @@ def gerar_capa_reels(
         color: {COR_OFF_WHITE};
         display: flex;
         flex-direction: column;
+        overflow: visible;
     }}
 
     /* ----- Conteúdo principal (Topo) ----- */
@@ -173,8 +174,8 @@ def gerar_capa_reels(
 
     .pill-preco {{
         position: absolute;
-        right:-5px;
-        top:10;
+        right:-10px;
+        top:10px;
         background: #E2E8F0;
         color: {COR_AZUL_ESCURO};
         font-size: 38px;
@@ -185,6 +186,7 @@ def gerar_capa_reels(
         white-space: nowrap;
         line-height: 1;
         text-align: center;
+        z-index: 4;
     }}
 
     /* ----- Specs em linha centralizada ----- */
