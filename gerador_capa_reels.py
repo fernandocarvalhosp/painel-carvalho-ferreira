@@ -173,7 +173,7 @@ def gerar_capa_reels(
 
     .pill-preco {{
         position: absolute;
-        right:-5;
+        right:5;
         top:10;
         background: #E2E8F0;
         color: {COR_AZUL_ESCURO};
