@@ -195,11 +195,13 @@ def gerar_capa_reels(
         top: 280px;
         left: 50%;
         transform: translatex(-50%);
-        font-size: 28px;
+        font-size: 25px;
         font-weight: 500;
         color: #E2E8F0;
         text-align: center;
         letter-spacing: 0.5px;
+        white-space: nowrap;
+        width: max-content;
     }}
 
     .specs span + span::before {{
