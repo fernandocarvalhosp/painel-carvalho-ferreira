@@ -172,6 +172,7 @@ def gerar_capa_reels(
     /* ----- Badge / Pill do Preço ----- */
 
     .pill-preco {{
+        right:-5;
         background: #E2E8F0;
         color: {COR_AZUL_ESCURO};
         font-size: 35px;
