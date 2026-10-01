@@ -32,7 +32,7 @@ def gerar_capa_reels(
 
     nome_html = (
         f"<span class='nome'>{ctx['titulo_3']}</span>"
-        if ctx["titulo_3"]
+        if ctx.get("titulo_3")
         else ""
     )
 
@@ -77,56 +77,58 @@ def gerar_capa_reels(
         object-fit: cover;
     }}
 
+    /* Camada retangular branca de fundo parcial */
     .card-fundo {{
         position: absolute;
         left: 0;
-        bottom: 70px;
+        bottom: 430px;
         width: 780px;
-        height: 420px;
+        height: 40px;
         background: {COR_OFF_WHITE};
         z-index: 2;
     }}
 
+    /* Card azul principal */
     .card-azul {{
         position: absolute;
         left: 0;
-        bottom: 51px;
+        bottom: 50px;
         width: 900px;
-        height: 400px;
+        height: 420px;
         background: {COR_AZUL_ESCURO};
         z-index: 3;
-        padding: 42px 50px 0 50px;
+        padding: 40px 48px 0 48px;
         color: {COR_OFF_WHITE};
         display: flex;
         flex-direction: column;
     }}
 
-    /* ----- Conteúdo principal ----- */
+    /* ----- Conteúdo principal (Topo) ----- */
 
     .topo {{
         display: flex;
         flex-direction: row;
+        justify-content: space-between;
         align-items: flex-start;
-        gap: 28px;
-        min-height: 0;
+        width: 100%;
     }}
 
     .coluna-esquerda {{
-        flex: 1;
-        min-width: 0;
-        max-width: 480px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        max-width: 490px;
     }}
 
     .coluna-direita {{
-        flex-shrink: 0;
-        width: 300px;
         display: flex;
+        align-items: flex-start;
         justify-content: flex-end;
-        padding-top: 6px;
+        padding-top: 2px;
     }}
 
     .titulo {{
-        line-height: 1.1;
+        line-height: 1.15;
     }}
 
     .tipo {{
@@ -141,8 +143,8 @@ def gerar_capa_reels(
     .destaque {{
         display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 44px;
-        font-weight: 500;
+        font-size: 42px;
+        font-weight: 600;
         letter-spacing: 1.5px;
         text-transform: uppercase;
         color: {COR_OFF_WHITE};
@@ -151,53 +153,53 @@ def gerar_capa_reels(
     .nome {{
         display: block;
         margin-top: 4px;
-        font-size: 26px;
+        font-size: 24px;
         color: {COR_OFF_WHITE};
         font-weight: 400;
     }}
 
     .local {{
-        margin-top: 18px;
-        font-size: 17px;
-        letter-spacing: 1px;
+        margin-top: 22px;
+        font-size: 16px;
+        letter-spacing: 1.2px;
         text-transform: uppercase;
         color: {COR_AZUL_SUAVE};
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
     }}
 
-    /* ----- Pill do preço ----- */
+    /* ----- Badge / Pill do Preço ----- */
 
     .pill-preco {{
-        background: {COR_OFF_WHITE};
+        background: #E2E8F0;
         color: {COR_AZUL_ESCURO};
-        font-size: 34px;
-        font-weight: 700;
+        font-size: 35px;
+        font-weight: 800;
         letter-spacing: -0.3px;
-        padding: 14px 26px;
-        border-radius: 10px;
+        padding: 16px 28px;
+        border-radius: 8px;
         white-space: nowrap;
-        line-height: 1.15;
+        line-height: 1;
         text-align: center;
-        max-width: 300px;
     }}
 
-    /* ----- Specs em linha ----- */
+    /* ----- Specs em linha centralizada ----- */
 
     .specs {{
-        margin-top: 28px;
-        font-size: 18px;
+        margin-top: 36px;
+        font-size: 19px;
         font-weight: 500;
         color: #E2E8F0;
         text-align: center;
-        letter-spacing: 0.3px;
+        letter-spacing: 0.5px;
     }}
 
     .specs span + span::before {{
         content: "·";
-        margin: 0 12px;
+        margin: 0 10px;
         color: {COR_AZUL_SUAVE};
+        font-weight: bold;
     }}
 
     /* ----- Rodapé fixo ----- */
@@ -205,12 +207,12 @@ def gerar_capa_reels(
     .rodape {{
         margin-top: auto;
         padding: 16px 0 20px 0;
-        border-top: 1px solid rgba(148, 163, 184, 0.35);
+        border-top: 1px solid rgba(226, 232, 240, 0.25);
         display: flex;
         justify-content: space-between;
         align-items: center;
         font-size: 13px;
-        letter-spacing: 1.5px;
+        letter-spacing: 1.8px;
         font-weight: 600;
         text-transform: uppercase;
     }}
