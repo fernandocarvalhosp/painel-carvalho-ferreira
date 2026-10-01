@@ -193,7 +193,9 @@ def gerar_capa_reels(
     .specs {{
         position: absolute;
         top: 280px;
-        font-size: 19px;
+        left: 50%;
+        transform: translatex(-50%);
+        font-size: 28px;
         font-weight: 500;
         color: #E2E8F0;
         text-align: center;
