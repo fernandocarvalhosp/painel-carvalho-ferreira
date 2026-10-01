@@ -205,7 +205,7 @@ def gerar_capa_reels(
     /* ----- Rodapé fixo ----- */
 
     .rodape {{
-        margin-top: auto;
+        margin-bottom: 2px;
         padding: 16px 0 20px 0;
         border-top: 1px solid rgba(226, 232, 240, 0.25);
         display: flex;
