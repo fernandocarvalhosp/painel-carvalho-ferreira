@@ -85,7 +85,7 @@ def gerar_capa_reels(
         width: 780px;
         height: 40px;
         background: {COR_OFF_WHITE};
-        z-index: 2;
+        z-index: 5;
     }}
 
     /* Card azul principal */
