@@ -34,6 +34,7 @@ import gerador_pdf
 erro_import_dossie = None
 erro_import_carrossel = None
 erro_import_capa_reels = None
+erro_import_capa_post = None
 
 try:
     import gerador_dossie
@@ -54,6 +55,13 @@ try:
 except Exception as e:
     gerador_capa_reels = None
     erro_import_capa_reels = str(e)
+
+
+try:
+    import gerador_capa_post
+except Exception as e:
+    gerador_capa_post = None
+    erro_import_capa_post = str(e)
 
 
 try:
@@ -281,10 +289,6 @@ def numero_para_coluna(numero):
 
 # =========================================================
 # SALVAR DADOS
-#
-# IMPORTANTE:
-# Agora salva por NOME DO CABEÇALHO.
-# Não depende mais da posição fixa das colunas.
 # =========================================================
 
 def salvar_dados(codigo, novos_dados):
@@ -332,11 +336,6 @@ def salvar_dados(codigo, novos_dados):
         if linha_encontrada is None:
             return False
 
-        # -------------------------------------------------
-        # Dicionário:
-        # nome da coluna -> novo valor
-        # -------------------------------------------------
-
         dados_por_coluna = {}
 
         for chave, valor in novos_dados.items():
@@ -355,14 +354,6 @@ def salvar_dados(codigo, novos_dados):
 
         if not dados_por_coluna:
             return False
-
-        # -------------------------------------------------
-        # Fazemos apenas atualizações pontuais.
-        #
-        # Isso é fundamental:
-        # colunas novas que o cadastro não conhece
-        # permanecem intactas.
-        # -------------------------------------------------
 
         data = []
 
@@ -483,7 +474,6 @@ def carregar_dados_na_interface(dados):
 
         "f_legenda2": "LEGENDA 02",
 
-        # NOVOS CAMPOS DO PORTAL
         "f_publicar_portal": "PUBLICAR NO PORTAL",
 
         "f_destaque": "DESTAQUE",
@@ -718,6 +708,60 @@ def executar_gerador_capa_reels(codigo_imovel):
 
 
 # =========================================================
+# GERADOR DE CAPA PARA POST
+# =========================================================
+
+def executar_gerador_capa_post(codigo_imovel):
+
+    if gerador_capa_post is None:
+
+        detalhe = (
+            f" ({erro_import_capa_post})"
+            if erro_import_capa_post
+            else ""
+        )
+
+        return (
+            False,
+            f"Módulo gerador_capa_post não encontrado{detalhe}."
+        )
+
+    try:
+
+        importlib.reload(
+            gerador_capa_post
+        )
+
+        resultado = (
+            gerador_capa_post.gerar_capa_para_post(
+                codigo_imovel
+            )
+        )
+
+        if (
+            isinstance(
+                resultado,
+                (bytes, bytearray)
+            )
+            and len(resultado) > 1000
+        ):
+
+            return True, resultado
+
+        return (
+            False,
+            "Falha ao gerar a capa para Post."
+        )
+
+    except Exception as e:
+
+        return (
+            False,
+            f"Erro ao gerar capa para Post: {e}"
+        )
+
+
+# =========================================================
 # TRATAMENTO DE FOTOS
 # =========================================================
 
@@ -894,6 +938,8 @@ for var, val in [
     ("carrossel_resultado", None),
 
     ("capa_reels_resultado", None),
+
+    ("capa_post_resultado", None),
 
 ]:
 
@@ -1289,6 +1335,82 @@ if st.session_state.get(
             use_container_width=True,
 
             key="dl_capa_reels_bytes",
+        )
+
+
+# =========================================================
+# CAPA PARA POST
+# =========================================================
+
+if st.sidebar.button(
+    "Gerar Capa Post",
+    use_container_width=True,
+    key="btn_capa_post"
+):
+
+    if not codigo_busca:
+
+        st.sidebar.error(
+            "Informe o codigo."
+        )
+
+    else:
+
+        with st.spinner(
+            "Gerando capa para Post..."
+        ):
+
+            ok, res = (
+                executar_gerador_capa_post(
+                    codigo_busca
+                )
+            )
+
+        if ok:
+
+            st.session_state[
+                "capa_post_resultado"
+            ] = res
+
+            st.sidebar.success(
+                "Capa para Post gerada."
+            )
+
+        else:
+
+            st.sidebar.error(
+                res
+            )
+
+
+if st.session_state.get(
+    "capa_post_resultado"
+) is not None:
+
+    capa_post_res = st.session_state[
+        "capa_post_resultado"
+    ]
+
+    if isinstance(
+        capa_post_res,
+        (bytes, bytearray)
+    ):
+
+        st.sidebar.download_button(
+
+            "Baixar Capa Post (ZIP)",
+
+            data=capa_post_res,
+
+            file_name=(
+                f"capa_post_{codigo_busca}.zip"
+            ),
+
+            mime="application/zip",
+
+            use_container_width=True,
+
+            key="dl_capa_post_bytes",
         )
 
 
@@ -1851,15 +1973,6 @@ if st.button(
 
     else:
 
-        # -------------------------------------------------
-        # IMPORTANTE:
-        #
-        # Não montamos mais uma lista fixa.
-        # Agora cada valor é associado ao nome da coluna.
-        #
-        # Isso protege as novas colunas da planilha.
-        # -------------------------------------------------
-
         dados_para_salvar = {
 
             "CODIGO":
@@ -1949,7 +2062,6 @@ if st.button(
             "LEGENDA 02":
                 nova_legenda_2,
 
-            # NOVOS CAMPOS
             "PUBLICAR NO PORTAL":
                 novo_publicar_portal,
 
@@ -1973,9 +2085,6 @@ if st.button(
             st.success(
                 "Dados atualizados com sucesso!"
             )
-
-            # Atualiza imediatamente os dados
-            # em memória para a interface.
 
             dados_atualizados = (
                 buscar_imovel(
