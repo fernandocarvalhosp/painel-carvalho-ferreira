@@ -118,7 +118,7 @@ def gerar_capa_reels(
         display: flex;
         flex-direction: column;
         justify-content: flex-start;
-        max-width: 700px;
+        max-width: 750px;
     }}
 
     .coluna-direita {{
@@ -160,8 +160,8 @@ def gerar_capa_reels(
     }}
 
     .local {{
-        margin-top: 22px;
-        font-size: 16px;
+        matgin-top: 6px;
+        font-size: 18px;
         letter-spacing: 1.2px;
         text-transform: uppercase;
         color: {COR_AZUL_SUAVE};
@@ -192,7 +192,8 @@ def gerar_capa_reels(
     /* ----- Specs em linha centralizada ----- */
 
     .specs {{
-        margin-top: 36px;
+        position: absolute;
+        top: 360px;
         font-size: 19px;
         font-weight: 500;
         color: #E2E8F0;
