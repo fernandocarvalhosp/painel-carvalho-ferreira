@@ -41,12 +41,6 @@ def gerar_capa_reels(
         foto["nome"],
     )
 
-    condominio_html = (
-        f"<div>Cond. {ctx['condominio']}</div>"
-        if ctx["condominio"] and ctx["condominio"] != "-"
-        else ""
-    )
-
     html = f"""
     <html>
     <head>
@@ -101,19 +95,46 @@ def gerar_capa_reels(
         height: 431px;
         background: {COR_AZUL_ESCURO};
         z-index: 3;
-        padding: 60px 62px 45px 62px;
+        padding: 48px 55px 0 55px;
         color: {COR_OFF_WHITE};
+        display: flex;
+        flex-direction: column;
+    }}
+
+    .conteudo {{
+        flex: 1;
+        display: flex;
+        flex-direction: row;
+        gap: 40px;
+        min-height: 0;
+    }}
+
+    .coluna-esquerda {{
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        min-width: 0;
+    }}
+
+    .coluna-direita {{
+        width: 280px;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: flex-end;
+        text-align: right;
     }}
 
     .titulo {{
-        font-size: 43px;
-        line-height: 1.15;
+        line-height: 1.12;
     }}
 
     .tipo {{
         display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 36px;
+        font-size: 34px;
         font-weight: 500;
         letter-spacing: 2px;
         text-transform: uppercase;
@@ -122,7 +143,7 @@ def gerar_capa_reels(
     .destaque {{
         display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 45px;
+        font-size: 42px;
         font-weight: 500;
         letter-spacing: 2px;
         text-transform: uppercase;
@@ -131,47 +152,64 @@ def gerar_capa_reels(
 
     .nome {{
         display: block;
-        margin-top: 5px;
-        font-size: 30px;
+        margin-top: 4px;
+        font-size: 28px;
         color: {COR_OFF_WHITE};
         font-weight: 400;
     }}
 
     .local {{
-        margin-top: 25px;
-        font-size: 20px;
+        margin-top: 22px;
+        font-size: 18px;
         letter-spacing: 1px;
         text-transform: uppercase;
         color: {COR_AZUL_SUAVE};
         display: flex;
         align-items: center;
-        gap: 9px;
+        gap: 8px;
     }}
 
     .valor {{
-        margin-top: 23px;
-        font-size: 60px;
-        font-weight: 600;
+        font-size: 48px;
+        font-weight: 700;
         color: {COR_OFF_WHITE};
+        letter-spacing: -0.5px;
+        line-height: 1.1;
     }}
 
-    .info {{
-        margin-top: 25px;
-        font-size: 20px;
+    .specs {{
+        margin-top: 18px;
+        font-size: 18px;
         font-weight: 500;
         color: #E2E8F0;
         display: flex;
-        gap: 28px;
-        flex-wrap: wrap;
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-end;
     }}
 
-    .marca {{
-        padding-top: 10px;
-        bottom: 4px;
-        border-top: 1px solid rgba(155,255,255,.3);
-        font-size: 14px;
-        letter-spacing: 2px;
+    .rodape {{
+        flex-shrink: 0;
+        margin-top: auto;
+        padding: 16px 0 22px 0;
+        border-top: 1px solid rgba(148, 163, 184, 0.35);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+        letter-spacing: 1.5px;
         font-weight: 600;
+        text-transform: uppercase;
+        color: {COR_AZUL_SUAVE};
+    }}
+
+    .rodape-esquerda {{
+        color: {COR_OFF_WHITE};
+    }}
+
+    .rodape-direita {{
+        color: {COR_AZUL_SUAVE};
+        font-weight: 500;
     }}
 
     </style>
@@ -185,54 +223,55 @@ def gerar_capa_reels(
 
         <div class="card-azul">
 
-            <div class="titulo">
+            <div class="conteudo">
 
-                <span class="tipo">
-                    {ctx['titulo_1']}
-                </span>
+                <div class="coluna-esquerda">
 
-                <span class="destaque">
-                    {ctx['titulo_2']}
-                </span>
+                    <div class="titulo">
 
-                {nome_html}
+                        <span class="tipo">
+                            {ctx['titulo_1']}
+                        </span>
 
-            </div>
+                        <span class="destaque">
+                            {ctx['titulo_2']}
+                        </span>
 
-            <div class="local">
+                        {nome_html}
 
-                {ctx['pin']}
+                    </div>
 
-                <span>
-                    {ctx['bairro']} • {ctx['cidade']}
-                </span>
+                    <div class="local">
 
-            </div>
+                        {ctx['pin']}
 
-            <div class="valor">
-                {ctx['valor']}
-            </div>
+                        <span>
+                            {ctx['bairro']} • {ctx['cidade']}
+                        </span>
 
-            <div class="info">
+                    </div>
 
-                <div>
-                    {ctx['dormitorios']} dorm.
                 </div>
 
-                <div>
-                    {ctx['vagas']} vagas
-                </div>
+                <div class="coluna-direita">
 
-                <div>
-                    {ctx['area']} const.
-                </div>
+                    <div class="valor">
+                        {ctx['valor']}
+                    </div>
 
-                {condominio_html}
+                    <div class="specs">
+                        <div>{ctx['dormitorios']} dorm.</div>
+                        <div>{ctx['vagas']} vagas</div>
+                        <div>{ctx['area']} const.</div>
+                    </div>
+
+                </div>
 
             </div>
 
-            <div class="marca">
-                CARVALHO FERREIRA
+            <div class="rodape">
+                <span class="rodape-esquerda">CARVALHO FERREIRA</span>
+                <span class="rodape-direita">Consultoria Imobiliária</span>
             </div>
 
         </div>
