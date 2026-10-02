@@ -162,10 +162,10 @@ def gerar_capa_reels(
     .local {{
         position: absolute;
         left: 48px;
-        bottom: 80px;
-        font-size: 18px;
+        bottom: 70px;
+        font-size: 28px;
         letter-spacing: 1.2px;
-        color: {COR_AZUL_SUAVE};
+        color: {COR_OFF_WHITE};
         display: block;
         align-items: center;
         gap: 6px;
@@ -270,7 +270,6 @@ def gerar_capa_reels(
                     </div>
 
                     <div class="local">
-                        {ctx['pin']}
                         <span>{ctx['bairro']} • {ctx['cidade']}</span>
                     </div>
 
