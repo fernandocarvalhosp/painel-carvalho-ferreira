@@ -83,11 +83,12 @@ def gerar_capa_reels(
 
     .foto {{
         position: absolute;
-        top: 0;
+        bottom: 0;
         left: 0;
         width: 1080px;
         height: 1920px;
         object-fit: cover;
+        objecte-position: bottom;
     }}
 
     /* Camada retangular branca de fundo parcial */
