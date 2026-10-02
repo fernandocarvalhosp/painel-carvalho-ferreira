@@ -191,7 +191,7 @@ def gerar_capa_reels(
         position: absolute;
         right: -20px;
         top: 20px;
-        background: #E2E8F0;
+        background: #F1F1F0;
         color: {COR_AZUL_ESCURO};
         font-size: 60px;
         font-weight: 800;
