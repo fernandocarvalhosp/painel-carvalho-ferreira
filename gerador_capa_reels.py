@@ -177,7 +177,7 @@ def gerar_capa_reels(
         top: 20px;
         background: #E2E8F0;
         color: {COR_AZUL_ESCURO};
-        font-size: 65px;
+        font-size: 60px;
         font-weight: 800;
         letter-spacing: -0.3px;
         padding: 16px 28px;
@@ -192,7 +192,7 @@ def gerar_capa_reels(
 
     .specs {{
         position: absolute;
-        left: 235px;           /* Alinhado em direção ao canto direito */
+        left: 570px;           /* Alinhado em direção ao canto direito */
         top: 125px;            /* Fica exatamente abaixo do pill-preco */
         display: flex;
         flex-direction: column;
