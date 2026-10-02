@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
 """
-Gerador de Capa para Post / Feed / Marketplace (1080x1350)
-Gera apenas 1 capa na proporção 4:5 (primeira foto da pasta) para Feed e Anúncios.
+Gerador de Capa para Post
+Gera a capa para feed/post do imóvel.
 """
 
 import io
@@ -20,7 +20,7 @@ from utils_geradores import (
 
 
 # =============================================================================
-# CAPA PARA POST / FEED
+# CAPA PARA POST
 # =============================================================================
 
 def gerar_capa_post(
@@ -77,11 +77,11 @@ def gerar_capa_post(
         object-fit: cover;
     }}
 
-    /* Camada retangular branca de fundo parcial ajustada para a altura do feed */
+    /* Camada retangular branca de fundo parcial */
     .card-fundo {{
         position: absolute;
         left: 0;
-        bottom: 405px;
+        bottom: 445px;
         width: 780px;
         height: 40px;
         background: {COR_OFF_WHITE};
@@ -92,12 +92,12 @@ def gerar_capa_post(
     .card-azul {{
         position: absolute;
         left: 0;
-        bottom: 40px;
+        bottom: 50px;
         width: 900px;
-        height: 380px;
+        height: 420px;
         background: {COR_AZUL_ESCURO};
         z-index: 3;
-        padding: 36px 48px 0 48px;
+        padding: 40px 48px 0 48px;
         color: {COR_OFF_WHITE};
         display: flex;
         flex-direction: column;
@@ -118,7 +118,14 @@ def gerar_capa_post(
         display: flex;
         flex-direction: column;
         justify-content: flex-start;
-        max-width: 530px;
+        max-width: 520px;
+    }}
+
+    .coluna-direita {{
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-end;
+        padding-top: 2px;
     }}
 
     .titulo {{
@@ -128,17 +135,17 @@ def gerar_capa_post(
     .tipo {{
         display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 48px;
+        font-size: 50px;
         font-weight: 500;
-        letter-spacing: 1.5px;
+        letter-spacing: -1px;
         text-transform: uppercase;
     }}
 
     .destaque {{
         display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 52px;
-        font-weight: 600;
+        font-size: 75px;
+        font-weight: 500;
         letter-spacing: 1.5px;
         text-transform: uppercase;
         color: {COR_OFF_WHITE};
@@ -147,17 +154,19 @@ def gerar_capa_post(
     .nome {{
         display: block;
         margin-top: 4px;
-        font-size: 26px;
+        font-size: 40px;
         color: {COR_OFF_WHITE};
         font-weight: 400;
     }}
 
     .local {{
-        margin-top: 10px;
-        font-size: 16px;
+        position: absolute;
+        left: 48px;
+        bottom: 80px;
+        font-size: 18px;
         letter-spacing: 1.2px;
         color: {COR_AZUL_SUAVE};
-        display: flex;
+        display: block;
         align-items: center;
         gap: 6px;
     }}
@@ -166,14 +175,14 @@ def gerar_capa_post(
 
     .pill-preco {{
         position: absolute;
-        right: -15px;
+        right: -20px;
         top: 20px;
         background: #E2E8F0;
         color: {COR_AZUL_ESCURO};
-        font-size: 40px;
+        font-size: 60px;
         font-weight: 800;
-        letter-spacing: -0.3px;
-        padding: 14px 24px;
+        letter-spacing: -3px;
+        padding: 16px 28px;
         border-radius: 8px;
         white-space: nowrap;
         line-height: 1;
@@ -181,26 +190,34 @@ def gerar_capa_post(
         z-index: 4;
     }}
 
-    /* ----- Specs em linha centralizada ----- */
+    /* ----- Specs em Lista Vertical (Posicionado abaixo do Preço) ----- */
 
     .specs {{
         position: absolute;
-        top: 250px;
-        left: 50%;
-        transform: translateX(-50%);
-        font-size: 22px;
-        font-weight: 500;
+        left: 530px;
+        top: 140px;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        font-size: 30px;
+        font-weight: 600;
         color: #E2E8F0;
-        text-align: center;
         letter-spacing: 0.5px;
-        white-space: nowrap;
-        width: max-content;
+        z-index: 4;
     }}
 
-    .specs span + span::before {{
-        content: "·";
-        margin: 0 10px;
+    .specs div {{
+        display: flex;
+        align-items: center;
+        white-space: nowrap;
+    }}
+
+    .specs div::before {{
+        content: "•";
+        margin-right: 8px;
         color: {COR_AZUL_SUAVE};
+        font-size: 24px;
         font-weight: bold;
     }}
 
@@ -211,12 +228,12 @@ def gerar_capa_post(
         bottom: 0;
         left: 48px;
         right: 48px;
-        padding: 14px 0 18px 0;
+        padding: 16px 0 20px 0;
         border-top: 1px solid rgba(226, 232, 240, 0.25);
         display: flex;
         justify-content: space-between;
         align-items: center;
-        font-size: 12px;
+        font-size: 13px;
         letter-spacing: 1.8px;
         font-weight: 600;
         text-transform: uppercase;
@@ -228,7 +245,7 @@ def gerar_capa_post(
 
     .rodape-direita {{
         color: {COR_AZUL_SUAVE};
-        font-weight: 500;
+        font-weight: 600;
     }}
 
     </style>
@@ -259,16 +276,19 @@ def gerar_capa_post(
 
                 </div>
 
+                <div class="coluna-direita">
+                    <div class="pill-preco">
+                        {ctx['valor']}
+                    </div>
+                </div>
+
             </div>
 
-            <div class="pill-preco">
-                {ctx['valor']}
-            </div>
-
+            <!-- Lista de Especificações posicionada abaixo do preço -->
             <div class="specs">
-                <span>{ctx['dormitorios']} dorm.</span>
-                <span>{ctx['vagas']} vagas</span>
-                <span>{ctx['area']} const.</span>
+                <div>{ctx['dormitorios']} dorm.</div>
+                <div>{ctx['vagas']} vagas</div>
+                <div>{ctx['area']} const.</div>
             </div>
 
             <div class="rodape">
