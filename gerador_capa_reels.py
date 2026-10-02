@@ -135,7 +135,7 @@ def gerar_capa_reels(
     .tipo {{
         display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 65px;
+        font-size: 80px;
         font-weight: 600;
         letter-spacing: -1px;
         text-transform: uppercase;
@@ -144,7 +144,7 @@ def gerar_capa_reels(
     .destaque {{
         display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 55px;
+        font-size: 60px;
         font-weight: 500;
         letter-spacing: 1.5px;
         text-transform: uppercase;
@@ -154,7 +154,7 @@ def gerar_capa_reels(
     .nome {{
         display: block;
         margin-top: 4px;
-        font-size: 30px;
+        font-size: 40px;
         color: {COR_OFF_WHITE};
         font-weight: 400;
     }}
@@ -192,7 +192,7 @@ def gerar_capa_reels(
 
     .specs {{
         position: absolute;
-        left: 570px;           /* Alinhado em direção ao canto direito */
+        left: 500px;           /* Alinhado em direção ao canto direito */
         top: 125px;            /* Fica exatamente abaixo do pill-preco */
         display: flex;
         flex-direction: column;
