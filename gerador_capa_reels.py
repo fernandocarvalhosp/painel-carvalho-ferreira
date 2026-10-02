@@ -135,7 +135,7 @@ def gerar_capa_reels(
     .tipo {{
         display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 70px;
+        font-size: 50px;
         font-weight: 500;
         letter-spacing: -1px;
         text-transform: uppercase;
@@ -144,7 +144,7 @@ def gerar_capa_reels(
     .destaque {{
         display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 85px;
+        font-size: 75px;
         font-weight: 500;
         letter-spacing: 1.5px;
         text-transform: uppercase;
