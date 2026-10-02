@@ -135,7 +135,7 @@ def gerar_capa_reels(
     .tipo {{
         display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 80px;
+        font-size: 70px;
         font-weight: 500;
         letter-spacing: -1px;
         text-transform: uppercase;
@@ -144,7 +144,7 @@ def gerar_capa_reels(
     .destaque {{
         display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 60px;
+        font-size: 85px;
         font-weight: 500;
         letter-spacing: 1.5px;
         text-transform: uppercase;
@@ -160,8 +160,8 @@ def gerar_capa_reels(
     }}
 
     .local {{
-        margin-bottom: 10px;
-        font-size: 18px;
+        margin-top: 20px;
+        font-size: 20px;
         letter-spacing: 1.2px;
         color: {COR_AZUL_SUAVE};
         display: flex;
@@ -192,8 +192,8 @@ def gerar_capa_reels(
 
     .specs {{
         position: absolute;
-        left: 510px;           /* Alinhado em direção ao canto direito */
-        margin-bottom: 10px;            /* Fica exatamente abaixo do pill-preco */
+        left: 520px;           /* Alinhado em direção ao canto direito */
+        bottom: 100px;            /* Fica exatamente abaixo do pill-preco */
         display: flex;
         flex-direction: column;
         align-items: flex-start; /* Alinha o texto e as bolinhas pela esquerda */
