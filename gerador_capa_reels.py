@@ -41,6 +41,19 @@ def gerar_capa_reels(
         foto["nome"],
     )
 
+    # -------------------------------------------------------------------------
+    # Cálculo dinâmico do tamanho da fonte do destaque (evita estourar a coluna)
+    # -------------------------------------------------------------------------
+    texto_destaque = ctx.get("titulo_2", "")
+    tam_destaque = len(texto_destaque)
+
+    if tam_destaque > 12:
+        tam_fonte_destaque = "45px"
+    elif tam_destaque > 8:
+        tam_fonte_destaque = "55px"
+    else:
+        tam_fonte_destaque = "75px"
+
     html = f"""
     <html>
     <head>
@@ -118,7 +131,7 @@ def gerar_capa_reels(
         display: flex;
         flex-direction: column;
         justify-content: flex-start;
-        max-width: 520px; /* Garante que o título não invada o espaço da direita */
+        max-width: 460px; /* Reduzido para dar margem e evitar sobreposição */
     }}
 
     .coluna-direita {{
@@ -144,17 +157,18 @@ def gerar_capa_reels(
     .destaque {{
         display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 75px;
+        font-size: {tam_fonte_destaque}; /* Fonte calculada dinamicamente */
         font-weight: 500;
         letter-spacing: 1.5px;
         text-transform: uppercase;
         color: {COR_OFF_WHITE};
+        word-wrap: break-word; /* Proteção contra quebra de linha */
     }}
 
     .nome {{
         display: block;
         margin-top: 4px;
-        font-size: 40px;
+        font-size: 35px;
         color: {COR_OFF_WHITE};
         font-weight: 400;
     }}
