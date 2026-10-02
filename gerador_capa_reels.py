@@ -166,7 +166,7 @@ def gerar_capa_reels(
         font-size: 18px;
         letter-spacing: 1.2px;
         color: {COR_AZUL_SUAVE};
-        display: flex;
+        display: block;
         align-items: center;
         gap: 6px;
     }}
