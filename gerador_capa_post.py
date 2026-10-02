@@ -187,10 +187,10 @@ def gerar_capa_post(
         position: absolute;
         left: 48px;
         bottom: 70px;
-        font-size: 20px;
+        font-size: 28px;
         letter-spacing: 1.2px;
-        color: {COR_AZUL_SUAVE};
-        display: flex;
+        color: {COR_OFF_WHITE};
+        display: block;
         align-items: center;
         gap: 8px;
     }}
@@ -300,7 +300,6 @@ def gerar_capa_post(
                     </div>
 
                     <div class="local">
-                        {ctx['pin']}
                         <span>{ctx['bairro']} • {ctx['cidade']}</span>
                     </div>
 
