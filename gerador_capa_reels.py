@@ -118,7 +118,7 @@ def gerar_capa_reels(
         display: flex;
         flex-direction: column;
         justify-content: flex-start;
-        max-width: 520px; /* Garante que o título não invada o espaço da direita */
+        max-width: 750px;
     }}
 
     .coluna-direita {{
@@ -160,7 +160,7 @@ def gerar_capa_reels(
     }}
 
     .local {{
-        margin-top: 10px;
+        magin-top: 6px;
         font-size: 18px;
         letter-spacing: 1.2px;
         color: {COR_AZUL_SUAVE};
@@ -169,12 +169,12 @@ def gerar_capa_reels(
         gap: 6px;
     }}
 
-    /* ----- Badge / Pill do Preço (Intacto) ----- */
+    /* ----- Badge / Pill do Preço ----- */
 
     .pill-preco {{
         position: absolute;
-        right: -15px;
-        top: 20px;
+        right:-15px;
+        top:20px;
         background: #E2E8F0;
         color: {COR_AZUL_ESCURO};
         font-size: 45px;
@@ -188,34 +188,26 @@ def gerar_capa_reels(
         z-index: 4;
     }}
 
-    /* ----- Specs em Lista Vertical (Posicionado abaixo do Preço) ----- */
+    /* ----- Specs em linha centralizada ----- */
 
     .specs {{
         position: absolute;
-        right: 35px;           /* Alinhado em direção ao canto direito */
-        top: 125px;            /* Fica exatamente abaixo do pill-preco */
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start; /* Alinha o texto e as bolinhas pela esquerda */
-        gap: 8px;
-        font-size: 22px;
-        font-weight: 600;
+        top: 280px;
+        left: 50%;
+        transform: translatex(-50%);
+        font-size: 25px;
+        font-weight: 500;
         color: #E2E8F0;
+        text-align: center;
         letter-spacing: 0.5px;
-        z-index: 4;
-    }}
-
-    .specs div {{
-        display: flex;
-        align-items: center;
         white-space: nowrap;
+        width: max-content;
     }}
 
-    .specs div::before {{
-        content: "•";
-        margin-right: 8px;
+    .specs span + span::before {{
+        content: "·";
+        margin: 0 10px;
         color: {COR_AZUL_SUAVE};
-        font-size: 24px;
         font-weight: bold;
     }}
 
@@ -282,11 +274,10 @@ def gerar_capa_reels(
 
             </div>
 
-            <!-- Lista de Especificações posicionada abaixo do preço -->
             <div class="specs">
-                <div>{ctx['dormitorios']} dorm.</div>
-                <div>{ctx['vagas']} vagas</div>
-                <div>{ctx['area']} const.</div>
+                <span>{ctx['dormitorios']} dorm.</span>
+                <span>{ctx['vagas']} vagas</span>
+                <span>{ctx['area']} const.</span>
             </div>
 
             <div class="rodape">
