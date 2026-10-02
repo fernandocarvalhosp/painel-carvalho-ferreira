@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Gerador de Capa para Post
+Gerador de Capa para Post (1080x1350)
 Gera a capa para feed/post do imóvel.
 """
 
@@ -40,6 +40,29 @@ def gerar_capa_post(
         foto["bytes"],
         foto["nome"],
     )
+
+    # -------------------------------------------------------------------------
+    # Cálculo dinâmico dos tamanhos de fonte (Destaque e Nome)
+    # -------------------------------------------------------------------------
+    texto_destaque = ctx.get("titulo_2", "")
+    tam_destaque = len(texto_destaque)
+
+    if tam_destaque > 12:
+        tam_fonte_destaque = "45px"
+    elif tam_destaque > 8:
+        tam_fonte_destaque = "55px"
+    else:
+        tam_fonte_destaque = "75px"
+
+    texto_nome = ctx.get("titulo_3", "")
+    tam_nome = len(texto_nome)
+
+    if tam_nome > 20:
+        tam_fonte_nome = "28px"
+    elif tam_nome > 12:
+        tam_fonte_nome = "32px"
+    else:
+        tam_fonte_nome = "38px"
 
     html = f"""
     <html>
@@ -118,7 +141,7 @@ def gerar_capa_post(
         display: flex;
         flex-direction: column;
         justify-content: flex-start;
-        max-width: 520px;
+        max-width: 460px; /* Margem ajustada para dar espaço à lista */
     }}
 
     .coluna-direita {{
@@ -144,17 +167,18 @@ def gerar_capa_post(
     .destaque {{
         display: block;
         font-family: 'Cormorant Garamond', Georgia, serif;
-        font-size: 75px;
+        font-size: {tam_fonte_destaque}; /* Ajuste dinâmico */
         font-weight: 500;
         letter-spacing: 1.5px;
         text-transform: uppercase;
         color: {COR_OFF_WHITE};
+        word-wrap: break-word;
     }}
 
     .nome {{
         display: block;
         margin-top: 4px;
-        font-size: 40px;
+        font-size: {tam_fonte_nome}; /* Ajuste dinâmico */
         color: {COR_OFF_WHITE};
         font-weight: 400;
     }}
@@ -162,13 +186,19 @@ def gerar_capa_post(
     .local {{
         position: absolute;
         left: 48px;
-        bottom: 80px;
-        font-size: 18px;
+        bottom: 70px;
+        font-size: 20px;
         letter-spacing: 1.2px;
         color: {COR_AZUL_SUAVE};
-        display: block;
+        display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
+    }}
+
+    .local svg, .local img, .local i {{
+        width: 22px;
+        height: 22px;
+        flex-shrink: 0;
     }}
 
     /* ----- Badge / Pill do Preço ----- */
