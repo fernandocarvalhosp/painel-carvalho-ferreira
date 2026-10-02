@@ -177,9 +177,9 @@ def gerar_capa_reels(
         top: 20px;
         background: #E2E8F0;
         color: {COR_AZUL_ESCURO};
-        font-size: 55px;
+        font-size: 58px;
         font-weight: 800;
-        letter-spacing: -10px;
+        letter-spacing: -8px;
         padding: 16px 25px;
         border-radius: 8px;
         white-space: nowrap;
