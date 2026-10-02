@@ -207,7 +207,7 @@ def gerar_capa_post(
         position: absolute;
         right: -20px;
         top: 20px;
-        background: #5C5C5C;
+        background: #F7F5F0;
         color: {COR_AZUL_ESCURO};
         font-size: 60px;
         font-weight: 800;
