@@ -98,6 +98,7 @@ def gerar_capa_post(
         width: 1080px;
         height: 1350px;
         object-fit: cover;
+        object-position: bottom;
     }}
 
     /* Camada retangular branca de fundo parcial */
