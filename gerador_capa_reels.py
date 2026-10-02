@@ -161,8 +161,9 @@ def gerar_capa_reels(
 
     .local {{
         position: absolute;
-        left: 20px;
+        left: 48px;
         bottom: 80px;
+        font-size: 18px;
         letter-spacing: 1.2px;
         color: {COR_AZUL_SUAVE};
         display: flex;
@@ -244,7 +245,7 @@ def gerar_capa_reels(
 
     .rodape-direita {{
         color: {COR_AZUL_SUAVE};
-        font-weight: 500;
+        font-weight: 600;
     }}
 
     </style>
